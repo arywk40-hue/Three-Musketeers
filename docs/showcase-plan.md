@@ -18,7 +18,7 @@ Current app checkpoint:
 - `apps/android` opens as the Android project root.
 - Dashboard has Vitals, Workout, Power, and Readiness tabs.
 - Demo mode streams live simulated ECG, vitals, workout, and power data.
-- BLE mode exists as a product surface; scanner implementation comes next.
+- BLE mode has runtime permission handling, scan/stop/connect controls, and a discovered-device list for `SmartSuit_v1`.
 
 ## Week 2
 

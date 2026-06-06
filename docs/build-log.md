@@ -25,3 +25,10 @@ Review fixes:
 - App state now starts behind `SmartSuitViewModel`.
 - Supercap progress bar fills available card width.
 - Samsung Health workflow/dependency docs now use the local AAR Data SDK path instead of the deprecated Maven/old Android SDK examples.
+
+Forward build:
+- Added runtime permission model for BLE scan/connect, body sensors, and activity recognition.
+- Added permission request banner while keeping Demo mode usable.
+- Added BLE scanner data source that looks for `SmartSuit_v1`.
+- Added discovered-device list and scan/stop/connect controls in the Ready tab.
+- BLE can discover/connect at the GATT skeleton level; sensor frames remain simulator-backed until firmware streams the custom GATT characteristics.

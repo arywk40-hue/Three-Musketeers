@@ -1,5 +1,7 @@
 package com.smartsuit.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +21,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -46,19 +49,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.smartsuit.ble.BleConnectionState
+import com.smartsuit.ble.DiscoveredBleDevice
 import com.smartsuit.data.FatigueStatus
 import com.smartsuit.data.PostureStatus
 import com.smartsuit.data.RiskStatus
 import com.smartsuit.data.SensorFrame
+import com.smartsuit.permissions.SmartSuitPermissions
 
 @Composable
 fun SmartSuitApp(
     smartSuitViewModel: SmartSuitViewModel = viewModel(),
 ) {
     val frame by smartSuitViewModel.frames.collectAsState()
+    val bleConnectionState by smartSuitViewModel.bleConnectionState.collectAsState()
+    val discoveredDevices by smartSuitViewModel.discoveredDevices.collectAsState()
+    val permissionController = rememberPermissionController()
     var selectedTab by remember { mutableStateOf(AppTab.Vitals) }
     var sessionMode by remember { mutableStateOf(SessionMode.Demo) }
 
@@ -81,6 +91,13 @@ fun SmartSuitApp(
                     onTabSelected = { selectedTab = it },
                     sessionMode = sessionMode,
                     onSessionModeSelected = { sessionMode = it },
+                    missingPermissions = permissionController.missingPermissions,
+                    onRequestPermissions = permissionController.requestPermissions,
+                    bleConnectionState = bleConnectionState,
+                    discoveredDevices = discoveredDevices,
+                    onStartBleScan = smartSuitViewModel::startBleScan,
+                    onStopBle = smartSuitViewModel::stopBle,
+                    onConnectFirstDevice = smartSuitViewModel::connectToFirstDiscoveredDevice,
                 )
             } ?: LoadingScreen()
         }
@@ -100,6 +117,31 @@ private enum class AppTab(
     Workout("Workout", Icons.Filled.FitnessCenter),
     Power("Power", Icons.Filled.Bolt),
     Readiness("Ready", Icons.Filled.Checklist),
+}
+
+private data class PermissionController(
+    val missingPermissions: List<String>,
+    val requestPermissions: () -> Unit,
+)
+
+@Composable
+private fun rememberPermissionController(): PermissionController {
+    val context = LocalContext.current
+    var missingPermissions by remember {
+        mutableStateOf(SmartSuitPermissions.missingPermissions(context))
+    }
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        missingPermissions = SmartSuitPermissions.missingPermissions(context)
+    }
+
+    return PermissionController(
+        missingPermissions = missingPermissions,
+        requestPermissions = {
+            launcher.launch(SmartSuitPermissions.requiredRuntimePermissions().toTypedArray())
+        },
+    )
 }
 
 @Composable
@@ -123,6 +165,13 @@ private fun AppShell(
     onTabSelected: (AppTab) -> Unit,
     sessionMode: SessionMode,
     onSessionModeSelected: (SessionMode) -> Unit,
+    missingPermissions: List<String>,
+    onRequestPermissions: () -> Unit,
+    bleConnectionState: BleConnectionState,
+    discoveredDevices: List<DiscoveredBleDevice>,
+    onStartBleScan: () -> Unit,
+    onStopBle: () -> Unit,
+    onConnectFirstDevice: () -> Unit,
 ) {
     Scaffold(
         bottomBar = {
@@ -156,6 +205,14 @@ private fun AppShell(
             item {
                 ModeNotice(sessionMode)
             }
+            if (missingPermissions.isNotEmpty()) {
+                item {
+                    PermissionNotice(
+                        missingPermissions = missingPermissions,
+                        onRequestPermissions = onRequestPermissions,
+                    )
+                }
+            }
             when (selectedTab) {
                 AppTab.Vitals -> {
                     item { EcgPanel(frame.ecgSamples) }
@@ -171,9 +228,68 @@ private fun AppShell(
                     item { PowerStrategyPanel(frame) }
                 }
                 AppTab.Readiness -> {
-                    item { ReadinessPanel(sessionMode) }
+                    item {
+                        ReadinessPanel(
+                            missingPermissions = missingPermissions,
+                            bleConnectionState = bleConnectionState,
+                        )
+                    }
+                    item {
+                        BleConnectionPanel(
+                            missingPermissions = missingPermissions,
+                            bleConnectionState = bleConnectionState,
+                            discoveredDevices = discoveredDevices,
+                            onRequestPermissions = onRequestPermissions,
+                            onStartBleScan = onStartBleScan,
+                            onStopBle = onStopBle,
+                            onConnectFirstDevice = onConnectFirstDevice,
+                        )
+                    }
                     item { DeploymentPanel() }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermissionNotice(
+    missingPermissions: List<String>,
+    onRequestPermissions: () -> Unit,
+) {
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFBEB)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = "Permissions needed for BLE mode",
+                    color = Color(0xFF92400E),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = missingPermissions.joinToString { SmartSuitPermissions.label(it) },
+                    color = Color(0xFF92400E),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            OutlinedButton(
+                onClick = onRequestPermissions,
+                shape = RoundedCornerShape(6.dp),
+            ) {
+                Text("Grant")
             }
         }
     }
@@ -481,7 +597,10 @@ private fun PowerStrategyPanel(frame: SensorFrame) {
 }
 
 @Composable
-private fun ReadinessPanel(sessionMode: SessionMode) {
+private fun ReadinessPanel(
+    missingPermissions: List<String>,
+    bleConnectionState: BleConnectionState,
+) {
     Card(
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -495,11 +614,127 @@ private fun ReadinessPanel(sessionMode: SessionMode) {
         ) {
             SectionTitle("Showcase readiness")
             ChecklistRow("Demo data stream", true)
+            ChecklistRow("Runtime permissions", missingPermissions.isEmpty())
             ChecklistRow("BLE contract defined", true)
-            ChecklistRow("Hardware sensor stream", sessionMode == SessionMode.Ble)
+            ChecklistRow("SmartSuit_v1 connected", bleConnectionState == BleConnectionState.Connected)
             ChecklistRow("Samsung SDK AAR installed", false)
             ChecklistRow("Partner approval received", false)
         }
+    }
+}
+
+@Composable
+private fun BleConnectionPanel(
+    missingPermissions: List<String>,
+    bleConnectionState: BleConnectionState,
+    discoveredDevices: List<DiscoveredBleDevice>,
+    onRequestPermissions: () -> Unit,
+    onStartBleScan: () -> Unit,
+    onStopBle: () -> Unit,
+    onConnectFirstDevice: () -> Unit,
+) {
+    val permissionsReady = missingPermissions.isEmpty()
+
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SectionTitle("BLE connection")
+                BleStatePill(bleConnectionState)
+            }
+
+            Text(
+                text = "Scanner looks for SmartSuit_v1. Sensor frames stay on simulator until firmware exposes the custom GATT stream.",
+                color = Color(0xFF64748B),
+                style = MaterialTheme.typography.bodySmall,
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = if (permissionsReady) onStartBleScan else onRequestPermissions,
+                    shape = RoundedCornerShape(6.dp),
+                ) {
+                    Text(if (permissionsReady) "Scan" else "Grant")
+                }
+                OutlinedButton(
+                    onClick = onStopBle,
+                    shape = RoundedCornerShape(6.dp),
+                    enabled = bleConnectionState != BleConnectionState.Idle,
+                ) {
+                    Text("Stop")
+                }
+                OutlinedButton(
+                    onClick = onConnectFirstDevice,
+                    shape = RoundedCornerShape(6.dp),
+                    enabled = permissionsReady && discoveredDevices.isNotEmpty(),
+                ) {
+                    Text("Connect")
+                }
+            }
+
+            if (discoveredDevices.isEmpty()) {
+                Text(
+                    text = "No SmartSuit_v1 advertisements yet.",
+                    color = Color(0xFF94A3B8),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                discoveredDevices.take(3).forEach { device ->
+                    DeviceRow(device)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BleStatePill(state: BleConnectionState) {
+    val color = when (state) {
+        BleConnectionState.Connected -> Color(0xFF0F766E)
+        BleConnectionState.Scanning, BleConnectionState.Connecting -> Color(0xFF2563EB)
+        BleConnectionState.Error, BleConnectionState.Unsupported, BleConnectionState.PermissionMissing -> Color(0xFFB91C1C)
+        else -> Color(0xFF64748B)
+    }
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(state.name, color = color, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun DeviceRow(device: DiscoveredBleDevice) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color(0xFFF8FAFC))
+            .padding(10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(device.name, color = Color(0xFF0F172A), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Text(device.address, color = Color(0xFF64748B), style = MaterialTheme.typography.bodySmall)
+        }
+        Text("${device.rssi} dBm", color = Color(0xFF475569), style = MaterialTheme.typography.labelMedium)
     }
 }
 
