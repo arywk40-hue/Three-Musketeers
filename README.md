@@ -119,6 +119,10 @@ This prototype is directly backed by two peer-reviewed papers:
 Full architecture → see [`architecture.md`](./architecture.md)  
 Dev workflow → see [`workflow.md`](./workflow.md)
 
+Product roadmap → see [`docs/product-roadmap.md`](./docs/product-roadmap.md)  
+One-month showcase plan → see [`docs/showcase-plan.md`](./docs/showcase-plan.md)  
+Android app scaffold → see [`apps/android`](./apps/android)
+
 ---
 
 ## Software
