@@ -329,85 +329,76 @@ This is what the LLM needs to know when writing Samsung Health integration code.
 ### Connecting to Samsung Health
 
 ```kotlin
-// Import from the local AAR — not from any Maven package
-import com.samsung.android.sdk.healthdata.HealthDataStore
-import com.samsung.android.sdk.healthdata.HealthConnectionErrorResult
-import com.samsung.android.sdk.healthdata.HealthConstants
-import com.samsung.android.sdk.healthdata.HealthDataResolver
-import com.samsung.android.sdk.healthdata.HealthPermissionManager
-import com.samsung.android.sdk.healthdata.HealthPermissionManager.PermissionKey
-import com.samsung.android.sdk.healthdata.HealthPermissionManager.PermissionType
+// Imports come from the local Samsung Health Data SDK AAR.
+// Current SDK package root:
+// com.samsung.android.sdk.health.data
 
-val store = HealthDataStore(context, object : HealthDataStore.ConnectionListener {
-    override fun onConnected() { /* store is ready */ }
-    override fun onConnectionFailed(error: HealthConnectionErrorResult) { }
-    override fun onDisconnected() { }
-})
-store.connectService()
-
-// Always call in onDestroy:
-store.disconnectService()
+val healthDataStore = HealthDataService.getStore(applicationContext)
 ```
 
 ### Requesting Permissions
 
 ```kotlin
-val pmsManager = HealthPermissionManager(store)
 val permissions = setOf(
-    PermissionKey(HealthConstants.HeartRate.HEALTH_DATA_TYPE, PermissionType.READ),
-    PermissionKey(HealthConstants.HeartRate.HEALTH_DATA_TYPE, PermissionType.WRITE),
-    PermissionKey(HealthConstants.SpO2.HEALTH_DATA_TYPE, PermissionType.WRITE),
-    PermissionKey(HealthConstants.BloodPressure.HEALTH_DATA_TYPE, PermissionType.WRITE),
-    PermissionKey(HealthConstants.BodyTemperature.HEALTH_DATA_TYPE, PermissionType.WRITE),
-    PermissionKey(HealthConstants.Exercise.HEALTH_DATA_TYPE, PermissionType.WRITE),
+    Permission.of(DataTypes.HEART_RATE, AccessType.READ),
+    Permission.of(DataTypes.HEART_RATE, AccessType.WRITE),
+    Permission.of(DataTypes.BLOOD_OXYGEN, AccessType.WRITE),
+    Permission.of(DataTypes.BLOOD_PRESSURE, AccessType.WRITE),
+    Permission.of(DataTypes.BODY_TEMPERATURE, AccessType.WRITE),
+    Permission.of(DataTypes.EXERCISE, AccessType.WRITE),
 )
-pmsManager.requestPermissions(permissions, activity)
+
+val granted = healthDataStore.getGrantedPermissions(permissions)
+val missing = permissions - granted
+if (missing.isNotEmpty()) {
+    healthDataStore.requestPermissions(missing, activity)
+}
 ```
 
 ### Writing Health Data (suit sensor → Samsung Health)
 
 ```kotlin
-val resolver = HealthDataResolver(store, null)
+val dataPoint = HealthDataPoint.builder()
+    .setStartTime(startTime)
+    .setEndTime(endTime)
+    .setDeviceId(registeredSmartSuitDeviceId)
+    .addFieldData(DataType.HeartRateType.HEART_RATE, bpm)
+    .build()
 
-// Write heart rate
-val hrData = HealthData().apply {
-    putString(HealthConstants.HeartRate.DEVICE_UUID, "SmartSuit_v1")
-    putInt(HealthConstants.HeartRate.HEART_RATE, bpm)
-    putLong(HealthConstants.HeartRate.START_TIME, System.currentTimeMillis())
-    putLong(HealthConstants.HeartRate.TIME_OFFSET, TimeZone.getDefault().rawOffset.toLong())
-}
-val request = resolver.requestForInsert(HealthConstants.HeartRate.HEALTH_DATA_TYPE)
-request.request.put(hrData)
-request.flush()
+val request = DataTypes.HEART_RATE.insertDataRequestBuilder
+    .addData(dataPoint)
+    .build()
+
+healthDataStore.insertData(request)
 ```
 
 ### Health Data Types available for WRITE
 
 ```kotlin
-HealthConstants.BloodGlucose.HEALTH_DATA_TYPE
-HealthConstants.BloodOxygen.HEALTH_DATA_TYPE     // SpO2
-HealthConstants.BloodPressure.HEALTH_DATA_TYPE
-HealthConstants.BodyComposition.HEALTH_DATA_TYPE
-HealthConstants.BodyTemperature.HEALTH_DATA_TYPE
-HealthConstants.Exercise.HEALTH_DATA_TYPE
-HealthConstants.ExerciseLocation.HEALTH_DATA_TYPE
-HealthConstants.FloorsClimbed.HEALTH_DATA_TYPE
-HealthConstants.HeartRate.HEALTH_DATA_TYPE
-HealthConstants.Nutrition.HEALTH_DATA_TYPE
-HealthConstants.Sleep.HEALTH_DATA_TYPE
-HealthConstants.WaterIntake.HEALTH_DATA_TYPE
+DataTypes.BLOOD_GLUCOSE
+DataTypes.BLOOD_OXYGEN       // SpO2
+DataTypes.BLOOD_PRESSURE
+DataTypes.BODY_COMPOSITION
+DataTypes.BODY_TEMPERATURE
+DataTypes.EXERCISE
+DataTypes.EXERCISE_LOCATION
+DataTypes.FLOORS_CLIMBED
+DataTypes.HEART_RATE
+DataTypes.NUTRITION
+DataTypes.SLEEP
+DataTypes.WATER_INTAKE
 ```
 
 ### Health Data Types available for READ only
 
 ```kotlin
-HealthConstants.ActivitySummary.HEALTH_DATA_TYPE
-HealthConstants.EnergyScore.HEALTH_DATA_TYPE
-HealthConstants.IrregularHeartRhythmNotification.HEALTH_DATA_TYPE
-HealthConstants.SkinTemperature.HEALTH_DATA_TYPE
-HealthConstants.SleepApnea.HEALTH_DATA_TYPE
-HealthConstants.Steps.HEALTH_DATA_TYPE
-HealthConstants.UserProfile.HEALTH_DATA_TYPE
+DataTypes.ACTIVITY_SUMMARY
+DataTypes.ENERGY_SCORE
+DataTypes.IRREGULAR_HEART_RHYTHM_NOTIFICATION
+DataTypes.SKIN_TEMPERATURE
+DataTypes.SLEEP_APNEA
+DataTypes.STEPS
+DataTypes.USER_PROFILE
 // ... (read-only types come from Galaxy Watch / Samsung Health internal sensors)
 ```
 

@@ -4,9 +4,10 @@ This is the Android application foundation for the Smart Workout Suit.
 
 ## Current Build Stage
 
-- Jetpack Compose dashboard scaffold.
+- Jetpack Compose dashboard scaffold with Vitals, Workout, Power, and Readiness tabs.
 - Simulator-backed data stream for pitch reliability.
-- BLE and Samsung Health integration seams prepared.
+- BLE contract and data-source seam prepared.
+- Samsung Health integration seam prepared.
 - Samsung Health SDK classes are not imported yet, because the SDK AAR must be downloaded manually from Samsung Developer Portal.
 
 ## Open in Android Studio

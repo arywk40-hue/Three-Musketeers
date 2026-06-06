@@ -22,9 +22,10 @@ class SmartSuitSimulator : SmartSuitDataSource {
             if (tick % 4 == 0) reps += 1
 
             val workoutWave = sin(tick / 6.0)
-            val ecg = List(96) { index ->
-                val x = index / 96.0
-                val qrs = if (index % 24 in 3..5) 0.85f else 0f
+            val ecg = List(ECG_SAMPLE_COUNT) { index ->
+                val x = index / ECG_SAMPLE_COUNT.toDouble()
+                val phase = (index + tick * 6) % ECG_BEAT_PERIOD_SAMPLES
+                val qrs = if (phase in 3..8) 0.85f else 0f
                 (0.08 * sin(2.0 * PI * x * 5.0) + qrs + Random.nextDouble(-0.03, 0.03)).toFloat()
             }
 
@@ -52,5 +53,10 @@ class SmartSuitSimulator : SmartSuitDataSource {
 
             delay(900)
         }
+    }
+
+    private companion object {
+        const val ECG_SAMPLE_COUNT = 256
+        const val ECG_BEAT_PERIOD_SAMPLES = 205
     }
 }

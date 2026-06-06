@@ -1,9 +1,11 @@
 package com.smartsuit.samsung
 
 import com.smartsuit.data.SensorFrame
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 interface SamsungHealthBridge {
-    val state: SamsungHealthState
+    val state: StateFlow<SamsungHealthState>
 
     suspend fun connect()
     suspend fun requestPermissions()
@@ -19,7 +21,8 @@ enum class SamsungHealthState {
 }
 
 class NoOpSamsungHealthBridge : SamsungHealthBridge {
-    override val state: SamsungHealthState = SamsungHealthState.NeedsSdkAar
+    private val _state = MutableStateFlow(SamsungHealthState.NeedsSdkAar)
+    override val state: StateFlow<SamsungHealthState> = _state
 
     override suspend fun connect() = Unit
 

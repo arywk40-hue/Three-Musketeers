@@ -4,15 +4,21 @@
 
 Goal: Make the app feel real and make the hardware testable.
 
-- Scaffold Android app.
-- Build simulator-backed live dashboard.
-- Define BLE data model and packet contract.
+- Scaffold Android app. `Started`
+- Build simulator-backed live dashboard. `Started`
+- Define BLE data model and packet contract. `Started`
 - Validate AD8232 ECG and MAX30102 separately.
 - Start TEG to boost converter bench setup.
 
 Deliverable:
 - Phone screen shows believable live health and power metrics.
 - Serial logs exist for at least ECG or SpO2.
+
+Current app checkpoint:
+- `apps/android` opens as the Android project root.
+- Dashboard has Vitals, Workout, Power, and Readiness tabs.
+- Demo mode streams live simulated ECG, vitals, workout, and power data.
+- BLE mode exists as a product surface; scanner implementation comes next.
 
 ## Week 2
 

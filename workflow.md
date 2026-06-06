@@ -173,27 +173,33 @@ Use Android's `BluetoothLeScanner` to find devices advertising "SmartSuit_v1". O
 
 ### 4.2 Samsung Health Data SDK integration
 ```kotlin
-// build.gradle
-implementation("com.samsung.android.sdk.healthdata:samsung-health-data-sdk:1.x.x")
+// app/build.gradle.kts
+// Samsung Health Data SDK is downloaded from Samsung Developer Portal.
+// It is a local AAR, not a Maven dependency.
+implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("samsung-health-data-api*.aar"))))
+implementation("com.google.code.gson:gson:2.9.0")
 
-// MainActivity.kt
-val connectionListener = object : HealthDataStore.ConnectionListener {
-    override fun onConnected() {
-        // Now you can read/write Samsung Health data
-        writeHeartRate(latestHR)
-        writeSpO2(latestSpO2)
-        writeBloodPressure(latestBP_sys, latestBP_dia)
-    }
-}
-val store = HealthDataStore(context, connectionListener)
-store.connectService()
+// SamsungHealthBridge implementation shape
+val healthDataStore = HealthDataService.getStore(applicationContext)
+val dataPoint = HealthDataPoint.builder()
+    .setStartTime(startTime)
+    .setEndTime(endTime)
+    .setDeviceId(registeredSmartSuitDeviceId)
+    .addFieldData(DataType.HeartRateType.HEART_RATE, latestHR)
+    .build()
+
+val request = DataTypes.HEART_RATE.insertDataRequestBuilder
+    .addData(dataPoint)
+    .build()
+
+healthDataStore.insertData(request)
 ```
 
 Data types you write to Samsung Health:
-- `HealthConstants.HeartRate.HEALTH_DATA_TYPE`
-- `HealthConstants.SpO2.HEALTH_DATA_TYPE`
-- `HealthConstants.BloodPressure.HEALTH_DATA_TYPE`
-- `HealthConstants.BodyTemperature.HEALTH_DATA_TYPE`
+- `DataTypes.HEART_RATE`
+- `DataTypes.BLOOD_OXYGEN`
+- `DataTypes.BLOOD_PRESSURE`
+- `DataTypes.BODY_TEMPERATURE`
 
 ### 4.3 Live dashboard screens
 
