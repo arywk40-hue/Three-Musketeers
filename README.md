@@ -11,7 +11,7 @@
 
 ## What is this?
 
-A compression workout suit (shirt + shorts) that monitors your body in real time and streams data to your phone — powered entirely by your own body heat, sunlight, and footsteps.
+The Smart Elderly Care Suit is a wearable health and safety system designed to help senior citizens live independently while continuously monitoring their wellbeing. The suit integrates textile-based sensors, AI-powered analytics, and wireless connectivity into comfortable everyday clothing, creating a non-intrusive healthcare platform that operates throughout the day.
 
 No charging. No battery pack. No cables.
 
@@ -29,10 +29,10 @@ The suit harvests energy from skin heat via a **Thermoelectric Generator (TEG)**
 - Sweat / humidity (SHT40)
 - Respiratory rate — derived from ECG + IMU
 
-**Workout intelligence**
-- Rep counter (bicep curl, squat, etc.) — LSTM on IMU data
-- Form scorer — posture quality [0–10] per rep
-- Core stability monitoring — lumbar IMU
+**Movement Prediction**
+- GAIT analysis - walking speed, step symmetry, stride length, foot clearance
+- Balance monitoring - Posture analysis, body sway detection
+- AI Fall prediction - If triggered, an automatic SOS is sent
 - Arm motion analysis — bilateral elbow IMUs
 
 **ML health alerts**
