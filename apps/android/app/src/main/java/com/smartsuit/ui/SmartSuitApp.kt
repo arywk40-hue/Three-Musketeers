@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.ContactPhone
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -67,8 +68,11 @@ import com.smartsuit.data.SensorFrame
 import com.smartsuit.permissions.SmartSuitPermissions
 import com.smartsuit.samsung.SamsungHealthState
 import com.smartsuit.ui.components.AlertTimeline
+import com.smartsuit.ui.components.PillStatus
+import com.smartsuit.ui.components.StatusPill
 import com.smartsuit.ui.components.TrendChart
 import com.smartsuit.ui.components.UrgentAlertBanner
+import com.smartsuit.ui.screens.SettingsScreen
 import com.smartsuit.notifications.CaregiverContact
 
 @Composable
@@ -85,6 +89,8 @@ fun SmartSuitApp(
     val alertHistory by smartSuitViewModel.alertHistory.collectAsState()
     val hrTrend by smartSuitViewModel.hrTrend.collectAsState()
     val spo2Trend by smartSuitViewModel.spo2Trend.collectAsState()
+    val caregiverPhoneNumber by smartSuitViewModel.caregiverPhoneNumber.collectAsState()
+    val caregiverDisplayName by smartSuitViewModel.caregiverDisplayName.collectAsState()
     val permissionController = rememberPermissionController()
     var selectedTab by remember { mutableStateOf(AppTab.Vitals) }
     var sessionMode by remember { mutableStateOf(SessionMode.Demo) }
@@ -119,9 +125,13 @@ fun SmartSuitApp(
                     alertHistory = alertHistory,
                     hrTrend = hrTrend,
                     spo2Trend = spo2Trend,
-                    caregiverDisplayName = smartSuitViewModel.caregiverDisplayName,
-                    caregiverPhoneNumber = smartSuitViewModel.caregiverPhoneNumber,
-                    onCallCaregiver = { ctx -> CaregiverContact.launchDialer(ctx) },
+                    caregiverDisplayName = caregiverDisplayName,
+                    caregiverPhoneNumber = caregiverPhoneNumber,
+                    onCallCaregiver = { ctx ->
+                        if (com.smartsuit.settings.isValidPhone(caregiverPhoneNumber)) {
+                            CaregiverContact.launchDialer(ctx, caregiverPhoneNumber)
+                        }
+                    },
                     onStartBleScan = smartSuitViewModel::startBleScan,
                     onStopBle = smartSuitViewModel::stopBle,
                     onConnectFirstDevice = smartSuitViewModel::connectToFirstDiscoveredDevice,
@@ -129,6 +139,7 @@ fun SmartSuitApp(
                     onTriggerSosDemo = smartSuitViewModel::triggerSosDemo,
                     onClearSosDemo = smartSuitViewModel::clearSosDemo,
                     onAcknowledgeUrgent = smartSuitViewModel::acknowledgeUrgent,
+                    onUpdateCaregiverContact = smartSuitViewModel::updateCaregiverContact,
                 )
             } ?: LoadingScreen()
         }
@@ -148,6 +159,7 @@ private enum class AppTab(
     Safety("Safety", Icons.Filled.HealthAndSafety),
     Caregiver("Care", Icons.Filled.ContactPhone),
     Readiness("Ready", Icons.Filled.Checklist),
+    Settings("Settings", Icons.Filled.Settings),
 }
 
 private data class PermissionController(
@@ -217,6 +229,7 @@ private fun AppShell(
     caregiverDisplayName: String,
     caregiverPhoneNumber: String,
     onCallCaregiver: (android.content.Context) -> Unit,
+    onUpdateCaregiverContact: suspend (displayName: String, phoneNumber: String) -> Boolean,
 ) {
     Scaffold(
         bottomBar = {
@@ -232,8 +245,17 @@ private fun AppShell(
             }
         }
     ) { padding ->
-        val context = androidx.compose.ui.platform.LocalContext.current
-        LazyColumn(
+        if (selectedTab == AppTab.Settings) {
+            SettingsScreen(
+                initialName = caregiverDisplayName,
+                initialPhone = caregiverPhoneNumber,
+                onSave = onUpdateCaregiverContact,
+                onBack = { onTabSelected(AppTab.Vitals) },
+                modifier = Modifier.padding(padding),
+            )
+        } else {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -347,6 +369,10 @@ private fun AppShell(
                     }
                     item { DeploymentPanel() }
                 }
+                AppTab.Settings -> {
+                    // Rendered outside the LazyColumn (see Scaffold content block).
+                }
+            }
             }
         }
     }
@@ -446,7 +472,7 @@ private fun Header(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ModeSwitch(sessionMode, onSessionModeSelected)
-            StatusPill(label = frame.fatigue.name, status = frame.fatigue)
+            StatusPill(label = frame.fatigue.name, status = PillStatus.Fatigue(frame.fatigue))
         }
     }
 }
@@ -622,11 +648,11 @@ private fun SafetyPanel(
                 MetricCard("SOS", if (frame.sosActive) "Active" else "Off", "", Modifier.weight(1f))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusPill(label = frame.posture.name, status = frame.posture)
-                StatusPill(label = frame.caregiverAlert.name, status = frame.caregiverAlert)
+                StatusPill(label = frame.posture.name, status = PillStatus.Posture(frame.posture))
+                StatusPill(label = frame.caregiverAlert.name, status = PillStatus.CaregiverAlert(frame.caregiverAlert))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusPill(label = "Fatigue ${frame.fatigue.name}", status = frame.fatigue)
+                StatusPill(label = "Fatigue ${frame.fatigue.name}", status = PillStatus.Fatigue(frame.fatigue))
             }
             HorizontalDivider(color = Color(0xFFE2E8F0))
             val sosButtonColor = if (sosOverride) Color(0xFFB91C1C) else Color(0xFF0F766E)
@@ -697,7 +723,7 @@ private fun CaregiverPanel(
                 MetricCard("Status", frame.caregiverAlert.name, "", Modifier.weight(1f))
                 MetricCard("Check-in", if (frame.sosActive) "Needed" else "OK", "", Modifier.weight(1f))
             }
-            StatusPill(label = frame.caregiverAlert.name, status = frame.caregiverAlert)
+            StatusPill(label = frame.caregiverAlert.name, status = PillStatus.CaregiverAlert(frame.caregiverAlert))
             HorizontalDivider(color = Color(0xFFE2E8F0))
             Text(
                 text = "Caregiver contact",
@@ -964,7 +990,7 @@ private fun EcgAnomalyCard(status: EcgAnomalyStatus) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SectionTitle("ECG rhythm")
-                StatusPill(label = status.name, status = rhythmSeverity(status))
+                StatusPill(label = status.name, status = PillStatus.Risk(rhythmSeverity(status)))
             }
             Text(
                 text = rhythmDescription(status),
@@ -1181,12 +1207,6 @@ private fun fatigueProgress(status: FatigueStatus): Float = when (status) {
     FatigueStatus.Stop -> 0.95f
 }
 
-@Composable
-private fun StatusPill(label: String, status: Any) {
-    val color = when (status) {
-        PostureStatus.Bad, FatigueStatus.Stop, RiskStatus.High -> Color(0xFFB91C1C)
-        CaregiverAlertStatus.Urgent -> Color(0xFFB91C1C)
-        PostureStatus.Warning, FatigueStatus.Caution, RiskStatus.Medium -> Color(0xFFB45309)
         CaregiverAlertStatus.Check -> Color(0xFFB45309)
         else -> Color(0xFF0F766E)
     }

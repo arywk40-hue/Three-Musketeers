@@ -3,24 +3,34 @@
  * Library: NimBLE-Arduino (Arduino Library Manager)
  * Board:   ESP32-C3 Dev Module
  *
- * Synthetic-data sketch for Phase 1 BLE showcase.
- * I2C sensor reading (MAX30102 + MPU-6050) is a Phase 2 task.
+ * Phase 2: real MAX30102 (HR + SpO2) and MPU-6050 (IMU) on the I²C bus.
+ * Both sensors share GPIO 6 (SDA) / GPIO 7 (SCL). Each sensor is
+ * initialised in setup() and a `*_ready` flag is set. If begin() /
+ * testConnection() fails the synthetic fallback path is used so the
+ * BLE pipe stays up and the Android dashboard does not break.
  *
  * SOS button is wired to GPIO 9 (active low, INPUT_PULLUP).
  * All custom characteristic UUIDs MUST match SmartSuitBleContract.kt.
  */
 
 #include <Arduino.h>
+#include <Wire.h>
 #include <NimBLEDevice.h>
 #include <NimBLEServer.h>
 #include <NimBLEUtils.h>
 #include <NimBLE2902.h>
 #include <math.h>
+#include "MAX30105.h"
+#include "heartRate.h"
+#include "spo2_algorithm.h"
+#include "MPU6050.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Hardware pin map
 // ─────────────────────────────────────────────────────────────────────────────
 static const uint8_t SOS_BTN_PIN = 9;   // active low, INPUT_PULLUP
+static const uint8_t I2C_SDA_PIN = 6;
+static const uint8_t I2C_SCL_PIN = 7;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UUIDs — MUST match SmartSuitBleContract.kt exactly
@@ -72,6 +82,30 @@ uint8_t g_deviceState   = 0;
 uint32_t g_tickCounter  = 0;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Sensor state
+// ─────────────────────────────────────────────────────────────────────────────
+static MAX30105 g_particleSensor;
+static MPU6050  g_mpu;
+static bool g_maxReady = false;     // MAX30102 detected and initialised
+static bool g_imuReady = false;     // MPU-6050 detected and initialised
+
+// Beat-to-beat interval history (circular buffer). Valid intervals are
+// those in [250, 2000] ms, i.e. 30 – 240 bpm.
+static const int BEAT_BUFFER_SIZE = 4;
+static int  g_beatIntervals[BEAT_BUFFER_SIZE] = {0, 0, 0, 0};
+static int  g_beatBufferIdx   = 0;
+static int  g_validBeatCount  = 0;
+static unsigned long g_lastBeatMs = 0;
+
+// SpO2 sample buffer — must hold exactly 100 samples for the Maxim algorithm.
+static const int SPO2_BUFFER_SIZE = 100;
+static uint32_t g_irBuffer[SPO2_BUFFER_SIZE];
+static uint32_t g_redBuffer[SPO2_BUFFER_SIZE];
+static int  g_spo2BufferIdx = 0;
+static int8_t g_spo2Percent = 0;
+static int8_t g_spo2Valid   = 0;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Float packing helpers
 // ─────────────────────────────────────────────────────────────────────────────
 void packFloat(uint8_t* buf, int offset, float val) {
@@ -121,6 +155,32 @@ void setup() {
 
     pinMode(SOS_BTN_PIN, INPUT_PULLUP);
 
+    // ── I²C bus (shared by MAX30102 and MPU-6050) ──
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+
+    // ── MAX30102 (pulse oximeter) ──
+    if (g_particleSensor.begin(Wire, I2C_SPEED_FAST)) {
+        Serial.println("MAX30102 found");
+        g_particleSensor.setup();
+        // Low-power red LED (0x0A ≈ 6.4 mA), green LED off (we only need IR for HR + SpO2 R).
+        g_particleSensor.setPulseAmplitudeRed(0x0A);
+        g_particleSensor.setPulseAmplitudeGreen(0);
+        g_maxReady = true;
+    } else {
+        Serial.println("MAX30102 NOT found — synthetic fallback active");
+        g_maxReady = false;
+    }
+
+    // ── MPU-6050 (6-axis IMU) ──
+    g_mpu.initialize();
+    if (g_mpu.testConnection()) {
+        Serial.println("MPU6050 found");
+        g_imuReady = true;
+    } else {
+        Serial.println("MPU6050 NOT found — synthetic fallback active");
+        g_imuReady = false;
+    }
+
     NimBLEDevice::init(DEVICE_NAME);
     NimBLEDevice::setPower(ESP_PWR_LVL_P9);
 
@@ -167,18 +227,95 @@ void setup() {
 void loop() {
     g_tickCounter++;
 
-    // ── Synthetic data ──
     float t = (float)g_tickCounter * 0.1f;
-    float hrBpmF = 75.0f + 6.0f * sinf(t * 0.5f);   // ~75 bpm via sine wave
+    float hrBpmF;
+
+    // ── Heart rate / SpO2 — real MAX30102 if available, else synthetic ──
+    if (g_maxReady) {
+        // Default fallback while we accumulate at least 3 valid intervals.
+        hrBpmF = 75.0f;
+        // Drain the FIFO without blocking. Each call to check() advances
+        // the library's beat-detection state machine and pushes one
+        // sample into the FIFO. We pull IR and RED for both beat detection
+        // and the SpO2 algorithm.
+        while (g_particleSensor.available()) {
+            g_particleSensor.check();
+            long irValue = g_particleSensor.getIR();
+            // Beat detection: checkForBeat returns true on a detected R-wave.
+            if (checkForBeat(irValue)) {
+                unsigned long now = millis();
+                if (g_lastBeatMs > 0) {
+                    long interval = (long)(now - g_lastBeatMs);
+                    if (interval >= 250 && interval <= 2000) {
+                        g_beatIntervals[g_beatBufferIdx] = (int)interval;
+                        g_beatBufferIdx = (g_beatBufferIdx + 1) % BEAT_BUFFER_SIZE;
+                        if (g_validBeatCount < BEAT_BUFFER_SIZE) g_validBeatCount++;
+                    }
+                }
+                g_lastBeatMs = now;
+            }
+            // Accumulate samples for the SpO2 algorithm. We accumulate
+            // IR and RED in lockstep so they correspond to the same moment.
+            if (g_spo2BufferIdx < SPO2_BUFFER_SIZE) {
+                g_redBuffer[g_spo2BufferIdx] = g_particleSensor.getRed();
+                g_irBuffer[g_spo2BufferIdx]  = (uint32_t)irValue;
+                g_spo2BufferIdx++;
+            }
+        }
+        // Compute mean HR from the last N beat-to-beat intervals.
+        if (g_validBeatCount >= 3) {
+            long sum = 0;
+            for (int i = 0; i < g_validBeatCount; i++) sum += g_beatIntervals[i];
+            long meanInterval = sum / g_validBeatCount;
+            if (meanInterval > 0) {
+                hrBpmF = 60000.0f / (float)meanInterval;
+            }
+        }
+        // Run the SpO2 algorithm once the buffer is full. Reset and
+        // restart the buffer. We log to Serial because no PLX
+        // characteristic exists in the current GATT contract.
+        if (g_spo2BufferIdx >= SPO2_BUFFER_SIZE) {
+            int32_t computedHr = 0, computedSpo2 = 0;
+            int8_t hrValid = 0;
+            maxim_heart_rate_and_oxygen_saturation(
+                g_irBuffer, SPO2_BUFFER_SIZE, g_redBuffer,
+                &computedSpo2, &computedHr, &g_spo2Valid, &g_spo2Percent);
+            g_spo2BufferIdx = 0;
+            if (g_spo2Valid) {
+                Serial.printf("SpO2: %d%%  HR(alg): %ld\n", g_spo2Percent, (long)computedHr);
+            }
+        }
+    } else {
+        // Synthetic fallback so the BLE pipe stays up and the demo
+        // continues to render the dashboard. The phase matches a
+        // patient at rest, ~75 bpm.
+        hrBpmF = 75.0f + 6.0f * sinf(t * 0.5f);
+    }
     uint8_t hrBpm = (uint8_t)(hrBpmF + 0.5f);
 
-    // Accel ~ 9.8 m/s² at rest, with tiny noise
-    float ax = 0.05f * sinf(t * 1.3f);
-    float ay = 0.04f * cosf(t * 1.7f);
-    float az = 9.81f + 0.06f * sinf(t * 0.9f);
-    float gx = 0.5f  * sinf(t * 0.6f);
-    float gy = 0.4f  * cosf(t * 0.5f);
-    float gz = 0.3f  * sinf(t * 0.4f);
+    // ── IMU — real MPU-6050 if available, else synthetic ──
+    // Accelerometer: ±2g range → 16384 LSB/g. Convert g → m/s² to match
+    // FallDetectionEngine thresholds (spike 24.5 m/s², stillness 3.0 m/s²).
+    // Gyroscope: ±250°/s range → 131 LSB/(°/s).
+    float ax, ay, az, gx, gy, gz;
+    if (g_imuReady) {
+        int16_t ax16, ay16, az16, gx16, gy16, gz16;
+        g_mpu.getMotion6(&ax16, &ay16, &az16, &gx16, &gy16, &gz16);
+        ax = (ax16 / 16384.0f) * 9.81f;
+        ay = (ay16 / 16384.0f) * 9.81f;
+        az = (az16 / 16384.0f) * 9.81f;
+        gx = gx16 / 131.0f;
+        gy = gy16 / 131.0f;
+        gz = gz16 / 131.0f;
+    } else {
+        // Synthetic: ~9.8 m/s² at rest, with tiny noise.
+        ax = 0.05f * sinf(t * 1.3f);
+        ay = 0.04f * cosf(t * 1.7f);
+        az = 9.81f + 0.06f * sinf(t * 0.9f);
+        gx = 0.5f  * sinf(t * 0.6f);
+        gy = 0.4f  * cosf(t * 0.5f);
+        gz = 0.3f  * sinf(t * 0.4f);
+    }
 
     // SOS mirrors GPIO9 button (active low → 1 when pressed)
     g_sosValue = (digitalRead(SOS_BTN_PIN) == LOW) ? 1 : 0;

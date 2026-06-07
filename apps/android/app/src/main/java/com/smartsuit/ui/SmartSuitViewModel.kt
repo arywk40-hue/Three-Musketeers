@@ -18,11 +18,12 @@ import com.smartsuit.database.ElderCareDatabase
 import com.smartsuit.database.toAlertEvent
 import com.smartsuit.database.toEntity
 import com.smartsuit.ml.AlertHistoryTracker
-import com.smartsuit.notifications.CaregiverContact
 import com.smartsuit.notifications.NotificationHelper
 import com.smartsuit.samsung.NoOpSamsungHealthBridge
 import com.smartsuit.samsung.SamsungHealthBridge
 import com.smartsuit.samsung.SamsungHealthState
+import com.smartsuit.settings.CaregiverPreferences
+import com.smartsuit.settings.isValidPhone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -41,6 +42,7 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     private val samsungBridge: SamsungHealthBridge = NoOpSamsungHealthBridge()
     private val db = ElderCareDatabase.getInstance(application.applicationContext)
     private val alertHistoryTracker = AlertHistoryTracker()
+    private val prefs = CaregiverPreferences.getInstance(application)
 
     private val _sosOverride = MutableStateFlow(false)
     val sosOverride: StateFlow<Boolean> = _sosOverride.asStateFlow()
@@ -57,8 +59,19 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     private val _spo2Trend = MutableStateFlow<List<Float>>(emptyList())
     val spo2Trend: StateFlow<List<Float>> = _spo2Trend.asStateFlow()
 
-    val caregiverPhoneNumber: String = CaregiverContact.CAREGIVER_PHONE_NUMBER
-    val caregiverDisplayName: String = CaregiverContact.CAREGIVER_DISPLAY_NAME
+    // Caregiver contact — collected from DataStore-backed flows. Initial value
+    // is the DataStore default (empty phone, "Caregiver" name) so the UI has
+    // something to render before the first read completes.
+    val caregiverPhoneNumber: StateFlow<String> = prefs.caregiverPhone.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+        initialValue = CaregiverPreferences.DEFAULT_PHONE,
+    )
+    val caregiverDisplayName: StateFlow<String> = prefs.caregiverName.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+        initialValue = CaregiverPreferences.DEFAULT_NAME,
+    )
 
     val frames: StateFlow<SensorFrame?> = combine(
         simulator.frames,
@@ -83,9 +96,6 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
 
     init {
         // One-shot seed of in-memory history from persisted Room data on startup.
-        // We intentionally do NOT keep observing getRecent() — every insert would
-        // re-emit and force a re-seed, which is wasteful and racey with the
-        // in-memory append path below.
         viewModelScope.launch {
             val persisted = withContext(Dispatchers.IO) {
                 db.alertEventDao().getRecent().first()
@@ -96,8 +106,6 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         // Watch live frames, update trends and append to alert history on transitions.
-        // AlertHistoryTracker.onFrame is mutex-guarded internally, so the read/mutate of
-        // the previous-level is safe even if this collector is ever moved to IO.
         viewModelScope.launch {
             frames.filterNotNull().collect { frame ->
                 _hrTrend.value = (_hrTrend.value + frame.heartRateBpm.toFloat()).takeLast(60)
@@ -152,7 +160,25 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     fun clearSosDemo() { _sosOverride.value = false }
     fun acknowledgeUrgent() { _acknowledgedUrgent.value = true }
 
-    fun buildCaregiverDialIntent(): Intent = CaregiverContact.dialIntent(caregiverPhoneNumber)
+    /**
+     * Persist the caregiver contact. Both fields must be non-blank; the
+     * phone must contain at least 7 digits. Returns true on success.
+     */
+    suspend fun updateCaregiverContact(name: String, phone: String): Boolean {
+        val trimmedName = name.trim()
+        val trimmedPhone = phone.trim()
+        if (trimmedName.isBlank() || !isValidPhone(trimmedPhone)) return false
+        withContext(Dispatchers.IO) {
+            prefs.setBoth(trimmedName, trimmedPhone)
+        }
+        return true
+    }
+
+    fun buildCaregiverDialIntent(): Intent? {
+        val phone = caregiverPhoneNumber.value
+        if (!isValidPhone(phone)) return null
+        return com.smartsuit.notifications.CaregiverContact.dialIntent(phone)
+    }
 
     private fun postUrgentNotification(event: AlertEvent) {
         val context = getApplication<Application>()
