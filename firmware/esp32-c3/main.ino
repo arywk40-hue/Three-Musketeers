@@ -201,13 +201,29 @@ void loop() {
     g_battChr->setValue(&g_battValue, 1);
     g_battChr->notify();
 
-    // ── ECG_RAW (float32[256], 1024 bytes) — synthetic sine wave ──
+    // ── ECG_RAW (float32[256], 1024 bytes) — synthetic QRS-spike train ──
+    // 256 samples at 256 Hz = 1 second of ECG. The QRS spike is placed every
+    // (60 / hrBpm) seconds, so the Android HeartRateExtractor sees a realistic
+    // R-peak interval that matches the device's nominal HR. The float cursor
+    // keeps beat timing drift-free across notify windows.
     {
         uint8_t ecgBuf[1024];
+        const float sampleRateHz = 256.0f;
+        const float samplesPerBeat = (60.0f / hrBpmF) * sampleRateHz;
+        const float qrsCenterFrac = 0.35f;
+        const float qrsWidth = 3.0f;        // ~12 ms — narrow positive R-wave
+        const float qrsAmplitude = 0.9f;
+        static float sampleCursor = 0.0f;
         for (int i = 0; i < 256; i++) {
-            float v = 0.4f * sinf(2.0f * 3.1415926f * (float)i / 64.0f);
+            float posInBeat = fmodf(sampleCursor + (float)i, samplesPerBeat);
+            float qrsCenter = samplesPerBeat * qrsCenterFrac;
+            float diff = posInBeat - qrsCenter;
+            float qrs = qrsAmplitude * expf(-(diff * diff) / (2.0f * qrsWidth * qrsWidth));
+            float baseline = 0.05f * sinf(t * 0.05f);
+            float v = baseline + qrs;
             packFloat(ecgBuf, i * 4, v);
         }
+        sampleCursor += 256.0f;
         g_ecgChr->setValue(ecgBuf, sizeof(ecgBuf));
         g_ecgChr->notify();
     }

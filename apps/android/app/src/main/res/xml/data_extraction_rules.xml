@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <!--
+        API 31+ replacement for backup_rules.xml. Both cloud backup and
+        device-to-device transfer are explicitly disallowed for the Room
+        database (which contains health alert history).
+
+        See docs/security-model.md for the threat model.
+    -->
+    <cloud-backup>
+        <exclude domain="database" path="eldercare.db" />
+        <exclude domain="database" path="eldercare.db-journal" />
+        <exclude domain="database" path="eldercare.db-shm" />
+        <exclude domain="database" path="eldercare.db-wal" />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="database" path="eldercare.db" />
+        <exclude domain="database" path="eldercare.db-journal" />
+        <exclude domain="database" path="eldercare.db-shm" />
+        <exclude domain="database" path="eldercare.db-wal" />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="." />
+    </device-transfer>
+</data-extraction-rules>

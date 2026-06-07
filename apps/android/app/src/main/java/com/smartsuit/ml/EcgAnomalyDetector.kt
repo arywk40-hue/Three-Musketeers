@@ -7,7 +7,7 @@ object EcgAnomalyDetector {
     private const val TACHY_THRESHOLD_BPM = 100
     private const val BRADY_THRESHOLD_BPM = 50
     private const val AFIB_RMSSD_THRESHOLD_MS = 25
-    private const val NORMAL_RMSSD_MIN_MS = 30
+    private const val AFIB_IRREGULARITY_THRESHOLD = 0.30f
     private const val MIN_RR_INTERVALS = 4
 
     data class EcgAssessment(
@@ -28,13 +28,15 @@ object EcgAnomalyDetector {
             }
         }
 
-        val rmssd = HeartRateExtractor.rmssd(rr.rrIntervalsMs)
+        // Past the early return we are guaranteed rr.rrIntervalsMs.size >= MIN_RR_INTERVALS >= 2,
+        // so rmssd() will not return null. No need to re-check.
+        val rmssd = HeartRateExtractor.rmssd(rr.rrIntervalsMs)!!
         val irregularity = rrIrregularity(rr.rrIntervalsMs)
         val status = when {
             meanHr >= TACHY_THRESHOLD_BPM -> EcgAnomalyStatus.Tachycardia
             meanHr <= BRADY_THRESHOLD_BPM -> EcgAnomalyStatus.Bradycardia
-            rmssd != null && (rmssd < AFIB_RMSSD_THRESHOLD_MS || irregularity > 0.30) -> EcgAnomalyStatus.AFib
-            rmssd == null || rmssd >= NORMAL_RMSSD_MIN_MS -> EcgAnomalyStatus.Normal
+            rmssd < AFIB_RMSSD_THRESHOLD_MS || irregularity > AFIB_IRREGULARITY_THRESHOLD ->
+                EcgAnomalyStatus.AFib
             else -> EcgAnomalyStatus.Normal
         }
         return EcgAssessment(status, rmssd, meanHr)

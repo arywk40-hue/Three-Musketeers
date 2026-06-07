@@ -69,6 +69,7 @@ import com.smartsuit.samsung.SamsungHealthState
 import com.smartsuit.ui.components.AlertTimeline
 import com.smartsuit.ui.components.TrendChart
 import com.smartsuit.ui.components.UrgentAlertBanner
+import com.smartsuit.notifications.CaregiverContact
 
 @Composable
 fun SmartSuitApp(
@@ -118,6 +119,9 @@ fun SmartSuitApp(
                     alertHistory = alertHistory,
                     hrTrend = hrTrend,
                     spo2Trend = spo2Trend,
+                    caregiverDisplayName = smartSuitViewModel.caregiverDisplayName,
+                    caregiverPhoneNumber = smartSuitViewModel.caregiverPhoneNumber,
+                    onCallCaregiver = { ctx -> CaregiverContact.launchDialer(ctx) },
                     onStartBleScan = smartSuitViewModel::startBleScan,
                     onStopBle = smartSuitViewModel::stopBle,
                     onConnectFirstDevice = smartSuitViewModel::connectToFirstDiscoveredDevice,
@@ -210,6 +214,9 @@ private fun AppShell(
     onTriggerSosDemo: () -> Unit,
     onClearSosDemo: () -> Unit,
     onAcknowledgeUrgent: () -> Unit,
+    caregiverDisplayName: String,
+    caregiverPhoneNumber: String,
+    onCallCaregiver: (android.content.Context) -> Unit,
 ) {
     Scaffold(
         bottomBar = {
@@ -225,6 +232,7 @@ private fun AppShell(
             }
         }
     ) { padding ->
+        val context = androidx.compose.ui.platform.LocalContext.current
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -300,7 +308,14 @@ private fun AppShell(
                     item { VitalsRiskPanel(frame) }
                 }
                 AppTab.Caregiver -> {
-                    item { CaregiverPanel(frame) }
+                    item {
+                        CaregiverPanel(
+                            frame = frame,
+                            caregiverDisplayName = caregiverDisplayName,
+                            caregiverPhoneNumber = caregiverPhoneNumber,
+                            onCallCaregiver = { onCallCaregiver(context) },
+                        )
+                    }
                     item { DailyStatusPanel(frame) }
                     item { AlertTimeline(events = alertHistory) }
                 }
@@ -660,7 +675,12 @@ private fun MotionPanel(frame: SensorFrame) {
 }
 
 @Composable
-private fun CaregiverPanel(frame: SensorFrame) {
+private fun CaregiverPanel(
+    frame: SensorFrame,
+    caregiverDisplayName: String,
+    caregiverPhoneNumber: String,
+    onCallCaregiver: () -> Unit,
+) {
     Card(
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -678,6 +698,37 @@ private fun CaregiverPanel(frame: SensorFrame) {
                 MetricCard("Check-in", if (frame.sosActive) "Needed" else "OK", "", Modifier.weight(1f))
             }
             StatusPill(label = frame.caregiverAlert.name, status = frame.caregiverAlert)
+            HorizontalDivider(color = Color(0xFFE2E8F0))
+            Text(
+                text = "Caregiver contact",
+                color = Color(0xFF64748B),
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = caregiverDisplayName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = caregiverPhoneNumber,
+                        color = Color(0xFF475569),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Button(
+                    onClick = onCallCaregiver,
+                    shape = RoundedCornerShape(6.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                ) {
+                    Text("Call")
+                }
+            }
         }
     }
 }
@@ -1012,11 +1063,25 @@ private fun SamsungHealthPanel(
                 color = Color(0xFF475569),
                 style = MaterialTheme.typography.bodySmall,
             )
-            OutlinedButton(
-                onClick = onStartSamsung,
-                shape = RoundedCornerShape(6.dp),
+            // Only surface the connect/permission button when the AAR is present
+            // and the bridge is actually usable. Clicking "Request permission"
+            // against a NoOp bridge was misleading the user into thinking the
+            // app was about to do something it can't.
+            if (samsungState == SamsungHealthState.NeedsPermission ||
+                samsungState == SamsungHealthState.Disabled
             ) {
-                Text("Request permission")
+                OutlinedButton(
+                    onClick = onStartSamsung,
+                    shape = RoundedCornerShape(6.dp),
+                ) {
+                    Text("Request permission")
+                }
+            } else if (samsungState == SamsungHealthState.NeedsSdkAar) {
+                Text(
+                    text = "Add health-data-api-1.1.0.aar to apps/android/app/libs/ to enable this section.",
+                    color = Color(0xFFB45309),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }

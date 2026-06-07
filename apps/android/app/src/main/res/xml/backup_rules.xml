@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!--
+        The Room database contains health-related alert history. Auto-backup
+        to Google Drive is disabled at the application level (allowBackup=false
+        in the manifest). This file is referenced in case backup is re-enabled
+        in the future — it currently excludes everything.
+
+        See docs/security-model.md for the threat model.
+    -->
+    <exclude domain="database" path="eldercare.db" />
+    <exclude domain="database" path="eldercare.db-journal" />
+    <exclude domain="database" path="eldercare.db-shm" />
+    <exclude domain="database" path="eldercare.db-wal" />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="file" path="." />
+</full-backup-content>
