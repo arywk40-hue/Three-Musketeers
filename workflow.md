@@ -1,7 +1,9 @@
-# Smart Workout Suit — Development Workflow
+# ElderCare Guardian — Development Workflow
 **Team:** Pranay · Ariyan · Reman Dey  
 **Version:** 1.0 | **Date:** June 2026  
 **Stack:** ESP32-C3 / nRF5340 → BLE 5.x → Samsung Health SDK → Android App → ML Models
+
+> Current direction: elderly safety and health monitoring wearable. Older smart-suit, fabric, TEG/solar/piezo, rep-counting, and workout sections are superseded by `docs/elder-care-pivot.md` and `docs/showcase-plan.md`.
 
 ---
 
@@ -117,11 +119,11 @@ Start with **ESP32-C3** (cheaper, widely available, BLE 5.0). Use the ESP-IDF BL
 
 Switch to **nRF5340** for the final prototype because it sleeps at ~1 µA vs ~5 µA for ESP32-C3. The 2023 Nature paper uses nRF's architecture directly.
 
-### 3.2 GATT Server profile on the suit (peripheral role)
+### 3.2 GATT Server profile on the elder-care wearable (peripheral role)
 
 ```
 Generic Access Service (0x1800)
-  Device Name: "SmartSuit_v1"
+  Device Name: "ElderCare_v1"
 
 Battery Service (0x180F)
   Battery Level: [0-100%] — derived from supercap voltage
@@ -138,13 +140,13 @@ Blood Pressure Service (0x1810)             → Samsung Health reads this native
 Health Thermometer Service (0x1809)
   Temperature Measurement [0x2A1C]
 
-Custom SmartSuit Service (UUID: your-uuid)  → read by your Android app
-  IMU_Elbow_L  [0x2A?? custom]
-  IMU_Elbow_R  [0x2A?? custom]
-  IMU_Lumbar   [0x2A?? custom]
-  Humidity     [0x2A?? custom]
-  Resp_Rate    [0x2A?? custom]
-  Power_mW     [0x2A?? custom]              (live TEG output for demo)
+Custom ElderCare Service (UUID: your-uuid)  → read by your Android app
+  ECG_RAW      [0x2A?? custom]
+  IMU_BODY     [0x2A?? custom]
+  RESP_RATE    [0x2A?? custom]
+  FALL_RISK    [0x2A?? custom]
+  SOS_STATUS   [0x2A?? custom]
+  ALERT_STATE  [0x2A?? custom]
 ```
 
 ### 3.3 Burst-and-sleep loop (from Nature 2023 paper)
@@ -169,7 +171,7 @@ With Accessory SDK docs open, confirm your GATT service UUIDs and characteristic
 **Owner:** Pranay
 
 ### 4.1 BLE client (scan → connect → subscribe)
-Use Android's `BluetoothLeScanner` to find devices advertising "SmartSuit_v1". On connect, subscribe to all GATT notifications. This is your raw sensor data stream.
+Use Android's `BluetoothLeScanner` to find devices advertising "ElderCare_v1". On connect, subscribe to all GATT notifications. This is your raw sensor data stream.
 
 ### 4.2 Samsung Health Data SDK integration
 ```kotlin
@@ -205,11 +207,10 @@ Data types you write to Samsung Health:
 
 | Screen | Data shown | Source |
 |--------|------------|--------|
-| **Home** | ECG waveform (scrolling), HR, SpO2, RR | BLE GATT |
-| **Workout** | Rep counter, posture status (Good/Warning/Bad), cadence | ML model output |
-| **Health** | BP estimate, hydration score, fatigue index | ML model output |
-| **Power** | TEG mW live, solar mW, supercap %, est. runtime | GATT custom service |
-| **History** | Samsung Health data — past workouts | Samsung Health Data SDK |
+| **Vitals** | ECG waveform (scrolling), HR, SpO2, RR | BLE GATT |
+| **Safety** | Fall risk, SOS, inactivity, posture state | BLE GATT + rule engine |
+| **Caregiver** | Alert level, contact status, last check-in | App alert policy |
+| **Readiness** | BLE state, Samsung Health bridge, battery | App + GATT |
 
 ### 4.4 ML inference on Android
 Run TFLite models on-device. Each model gets a sliding window of sensor data as input. See Phase 5 for model details.
@@ -232,19 +233,18 @@ interpreter.run(input, output)
 | Model | Input | Output | Algorithm | Dataset source |
 |-------|-------|--------|-----------|----------------|
 | ECG anomaly | 256-sample ECG window (256 Hz) | Normal / AFib / Tachy / Brady | 1D-CNN | PTB-XL, MIT-BIH |
-| VO2 max estimation | HR + age + IMU cadence | VO2max (mL/kg/min) | Ridge regression | Published formula + fine-tune |
-| Rep counter + form | 3-axis IMU (200 Hz), 2 s window | Rep count + form score [0–10] | LSTM | Self-collected during workout |
-| Dehydration risk | SHT40 sweat rate, skin temp, HR | Low / Medium / High risk | Random Forest | Self-collected |
-| Overexertion / fatigue | HR, SpO2, RR, IMU intensity | Safe / Caution / Stop | XGBoost / SVM | Self-collected |
+| Fall detection | IMU window + post-impact stillness | Normal / Possible / Confirmed fall | Rule engine first, LSTM later | Public fall datasets + staged tests |
+| Inactivity risk | IMU inactivity duration + time of day | Normal / Check / Urgent | Rule engine | Local thresholds |
+| Vitals risk | HR, SpO2, RR, temperature | Normal / Watch / Urgent | Rules first, tabular ML later | Clinical thresholds + validation |
 | BP estimation | PPG waveform features (MAX30102) | Systolic / Diastolic mmHg | CNN feature extractor | MIMIC-III / UCI BP |
 
 ### 5.2 Data collection plan
-For custom models (rep counter, dehydration, fatigue) you need your own data:
+For custom models (fall detection, inactivity, vitals risk) you need staged and public data:
 
 **Collect during Phase 3/4 testing:**
-- Wear suit during workouts, log raw sensor CSV with timestamps
-- Label manually: rep boundaries (video sync), fatigue onset (RPE scale), form errors (visual check)
-- Target: 2–3 hours of labelled workout data minimum
+- Wear or clip the prototype, log raw sensor CSV with timestamps
+- Label manually: normal walking, sitting, lying down, device removal, staged fall-like motions
+- Target: enough labelled motion variety to tune thresholds before training ML
 
 ### 5.3 Training pipeline
 ```
@@ -292,24 +292,22 @@ TEG patch, solar panels, and piezo insert must be **removable** before washing. 
 **Owner:** Full team
 
 ### Integration test checklist
-- [ ] Suit worn for 30 min continuous workout — no power loss
+- [ ] Wearable runs for 30 min continuous demo — no power loss
 - [ ] Samsung Health shows HR, SpO2, BP in its built-in history view
 - [ ] ECG waveform renders without artefact on app dashboard
-- [ ] Rep counter ≤ 1 rep error on 3 sets × 10 bicep curls
-- [ ] Posture model triggers warning on deliberate bad form
-- [ ] Dehydration alert fires after treadmill run
-- [ ] Power screen shows live TEG mW
-- [ ] Cover solar panels → system continues on TEG alone (showcase demo moment)
+- [ ] Fall-risk simulation changes Safety screen state
+- [ ] SOS button moves caregiver alert to urgent
+- [ ] Inactivity simulation moves caregiver alert to check-in
+- [ ] Battery/readiness screen remains stable during the demo
 
 ### Demo script (from PDF — expanded)
-1. Wear suit. Show Samsung Health recognised the device (Accessory SDK integration)
+1. Wear or clip the device. Show Samsung Health recognised the device where supported
 2. Live ECG waveform on phone screen
 3. SpO2 + HR updating
-4. 10 bicep curls → rep counter on screen, form score shown
-5. Cover solar panels → system keeps running on body heat only
-6. Power panel shows: TEG generating X mW from skin ΔT
-7. After 15-min run → dehydration risk changes to "Medium"
-8. Tilt forward deliberately → posture warning fires
+4. Trigger staged fall event -> Safety screen changes to high risk
+5. Press SOS -> Caregiver alert becomes urgent
+6. Show caregiver-ready alert copy and Samsung Health bridge status
+7. Show Readiness screen: BLE connected, battery, Samsung Health state
 
 ### Pitch line
 "The suit is powered entirely by body heat via thermoelectric generation — proven in Nature (2023) to run BLE sensing at ΔT as small as 4°C — and monitored end-to-end through Samsung Health. ML models running on-device classify your ECG, count your reps, grade your form, and flag fatigue and dehydration in real time. No battery. No charging. One suit."

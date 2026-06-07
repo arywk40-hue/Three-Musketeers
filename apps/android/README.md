@@ -1,14 +1,14 @@
-# Smart Suit Android App
+# ElderCare Guardian Android App
 
-This is the Android application foundation for the Smart Workout Suit.
+This is the Android application foundation for the ElderCare Guardian wearable.
 
 ## Current Build Stage
 
-- Jetpack Compose dashboard scaffold with Vitals, Workout, Power, and Readiness tabs.
+- Jetpack Compose dashboard scaffold with Vitals, Safety, Caregiver, and Readiness tabs.
 - Simulator-backed data stream for pitch reliability.
 - BLE contract and data-source seam prepared.
 - Runtime permission handling for BLE scan/connect, body sensors, and activity recognition.
-- Ready tab can scan for `SmartSuit_v1`, list discovered devices, and start a GATT connection skeleton.
+- Ready tab can scan for `ElderCare_v1`, list discovered devices, and start a GATT connection skeleton.
 - Samsung Health integration seam prepared.
 - Samsung Health SDK classes are not imported yet, because the SDK AAR must be downloaded manually from Samsung Developer Portal.
 

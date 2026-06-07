@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.smartsuit.ble.BleConnectionState
 import com.smartsuit.ble.DiscoveredBleDevice
 import com.smartsuit.ble.SmartSuitBleDataSource
+import com.smartsuit.ble.SmartSuitBleTelemetry
 import com.smartsuit.ble.SmartSuitSimulator
 import com.smartsuit.data.SensorFrame
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,6 +25,7 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
 
     val bleConnectionState: StateFlow<BleConnectionState> = bleDataSource.connectionState
     val discoveredDevices: StateFlow<List<DiscoveredBleDevice>> = bleDataSource.discoveredDevices
+    val bleTelemetry: StateFlow<SmartSuitBleTelemetry> = bleDataSource.telemetry
 
     fun startBleScan() {
         bleDataSource.startScan()

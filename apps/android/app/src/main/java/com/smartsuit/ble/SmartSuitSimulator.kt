@@ -1,6 +1,7 @@
 package com.smartsuit.ble
 
 import com.smartsuit.data.FatigueStatus
+import com.smartsuit.data.CaregiverAlertStatus
 import com.smartsuit.data.PostureStatus
 import com.smartsuit.data.RiskStatus
 import com.smartsuit.data.SensorFrame
@@ -15,13 +16,22 @@ import kotlinx.coroutines.flow.flow
 class SmartSuitSimulator : SmartSuitDataSource {
     override val frames: Flow<SensorFrame> = flow {
         var tick = 0
-        var reps = 0
 
         while (true) {
             tick += 1
-            if (tick % 4 == 0) reps += 1
 
-            val workoutWave = sin(tick / 6.0)
+            val dailyWave = sin(tick / 6.0)
+            val fallRisk = when {
+                tick % 37 in 32..36 -> RiskStatus.High
+                tick % 19 in 15..18 -> RiskStatus.Medium
+                else -> RiskStatus.Low
+            }
+            val sosActive = tick % 41 in 38..40
+            val caregiverAlert = when {
+                sosActive || fallRisk == RiskStatus.High -> CaregiverAlertStatus.Urgent
+                fallRisk == RiskStatus.Medium || tick % 23 in 19..22 -> CaregiverAlertStatus.Check
+                else -> CaregiverAlertStatus.Normal
+            }
             val ecg = List(ECG_SAMPLE_COUNT) { index ->
                 val x = index / ECG_SAMPLE_COUNT.toDouble()
                 val phase = (index + tick * 6) % ECG_BEAT_PERIOD_SAMPLES
@@ -32,20 +42,20 @@ class SmartSuitSimulator : SmartSuitDataSource {
             emit(
                 SensorFrame(
                     timestampMillis = System.currentTimeMillis(),
-                    heartRateBpm = 76 + (workoutWave * 10).toInt(),
+                    heartRateBpm = 76 + (dailyWave * 8).toInt(),
                     spo2Percent = 97.4f + Random.nextDouble(-0.3, 0.2).toFloat(),
-                    systolicMmHg = 118 + (workoutWave * 4).toInt(),
-                    diastolicMmHg = 76 + (workoutWave * 2).toInt(),
+                    systolicMmHg = 124 + (dailyWave * 5).toInt(),
+                    diastolicMmHg = 78 + (dailyWave * 2).toInt(),
                     skinTempC = 33.1f + Random.nextDouble(-0.2, 0.4).toFloat(),
-                    humidityPercent = 52f + (tick % 18) * 0.7f,
-                    respiratoryRate = 15 + (workoutWave * 2).toInt(),
-                    reps = reps,
-                    formScore = (8.5f + Random.nextDouble(-0.7, 0.4).toFloat()).coerceIn(0f, 10f),
-                    posture = if (tick % 17 == 0) PostureStatus.Warning else PostureStatus.Good,
-                    fatigue = if (tick % 29 == 0) FatigueStatus.Caution else FatigueStatus.Safe,
+                    humidityPercent = 49f + (tick % 18) * 0.4f,
+                    respiratoryRate = 15 + (dailyWave * 2).toInt(),
+                    posture = if (fallRisk == RiskStatus.High) PostureStatus.Bad else if (fallRisk == RiskStatus.Medium) PostureStatus.Warning else PostureStatus.Good,
+                    fatigue = if (caregiverAlert == CaregiverAlertStatus.Urgent) FatigueStatus.Stop else if (caregiverAlert == CaregiverAlertStatus.Check) FatigueStatus.Caution else FatigueStatus.Safe,
                     dehydration = if (tick > 42) RiskStatus.Medium else RiskStatus.Low,
-                    tegPowerMw = 4.2f + Random.nextDouble(-0.4, 0.6).toFloat(),
-                    solarPowerMw = 18.0f + Random.nextDouble(-2.0, 2.4).toFloat(),
+                    fallRisk = fallRisk,
+                    caregiverAlert = caregiverAlert,
+                    sosActive = sosActive,
+                    inactivityMinutes = if (tick % 31 > 24) tick % 31 else 0,
                     supercapPercent = (72 + (sin(tick / 8.0) * 8).toInt()).coerceIn(0, 100),
                     ecgSamples = ecg,
                 )

@@ -17,10 +17,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.ContactPhone
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.smartsuit.ble.BleConnectionState
 import com.smartsuit.ble.DiscoveredBleDevice
+import com.smartsuit.ble.SmartSuitBleTelemetry
+import com.smartsuit.data.CaregiverAlertStatus
 import com.smartsuit.data.FatigueStatus
 import com.smartsuit.data.PostureStatus
 import com.smartsuit.data.RiskStatus
@@ -68,6 +70,7 @@ fun SmartSuitApp(
     val frame by smartSuitViewModel.frames.collectAsState()
     val bleConnectionState by smartSuitViewModel.bleConnectionState.collectAsState()
     val discoveredDevices by smartSuitViewModel.discoveredDevices.collectAsState()
+    val bleTelemetry by smartSuitViewModel.bleTelemetry.collectAsState()
     val permissionController = rememberPermissionController()
     var selectedTab by remember { mutableStateOf(AppTab.Vitals) }
     var sessionMode by remember { mutableStateOf(SessionMode.Demo) }
@@ -95,6 +98,7 @@ fun SmartSuitApp(
                     onRequestPermissions = permissionController.requestPermissions,
                     bleConnectionState = bleConnectionState,
                     discoveredDevices = discoveredDevices,
+                    bleTelemetry = bleTelemetry,
                     onStartBleScan = smartSuitViewModel::startBleScan,
                     onStopBle = smartSuitViewModel::stopBle,
                     onConnectFirstDevice = smartSuitViewModel::connectToFirstDiscoveredDevice,
@@ -114,8 +118,8 @@ private enum class AppTab(
     val icon: ImageVector,
 ) {
     Vitals("Vitals", Icons.Filled.Favorite),
-    Workout("Workout", Icons.Filled.FitnessCenter),
-    Power("Power", Icons.Filled.Bolt),
+    Safety("Safety", Icons.Filled.HealthAndSafety),
+    Caregiver("Care", Icons.Filled.ContactPhone),
     Readiness("Ready", Icons.Filled.Checklist),
 }
 
@@ -169,6 +173,7 @@ private fun AppShell(
     onRequestPermissions: () -> Unit,
     bleConnectionState: BleConnectionState,
     discoveredDevices: List<DiscoveredBleDevice>,
+    bleTelemetry: SmartSuitBleTelemetry,
     onStartBleScan: () -> Unit,
     onStopBle: () -> Unit,
     onConnectFirstDevice: () -> Unit,
@@ -219,13 +224,13 @@ private fun AppShell(
                     item { MetricGrid(frame) }
                     item { HealthPanel(frame) }
                 }
-                AppTab.Workout -> {
-                    item { WorkoutPanel(frame) }
+                AppTab.Safety -> {
+                    item { SafetyPanel(frame) }
                     item { MotionPanel(frame) }
                 }
-                AppTab.Power -> {
-                    item { PowerPanel(frame) }
-                    item { PowerStrategyPanel(frame) }
+                AppTab.Caregiver -> {
+                    item { CaregiverPanel(frame) }
+                    item { DailyStatusPanel(frame) }
                 }
                 AppTab.Readiness -> {
                     item {
@@ -239,6 +244,7 @@ private fun AppShell(
                             missingPermissions = missingPermissions,
                             bleConnectionState = bleConnectionState,
                             discoveredDevices = discoveredDevices,
+                            bleTelemetry = bleTelemetry,
                             onRequestPermissions = onRequestPermissions,
                             onStartBleScan = onStartBleScan,
                             onStopBle = onStopBle,
@@ -298,8 +304,8 @@ private fun PermissionNotice(
 @Composable
 private fun ModeNotice(sessionMode: SessionMode) {
     val message = when (sessionMode) {
-        SessionMode.Demo -> "Demo stream active for reliable pitch rehearsals."
-        SessionMode.Ble -> "BLE scanner is the next build step; simulator remains as fallback until SmartSuit_v1 firmware is connected."
+        SessionMode.Demo -> "Demo stream active for reliable elder-care pitch rehearsals."
+        SessionMode.Ble -> "BLE scanner looks for ElderCare_v1; simulator remains as fallback until firmware streams sensor data."
     }
 
     Box(
@@ -331,7 +337,7 @@ private fun Header(
     ) {
         Column {
             Text(
-                text = "Smart Suit",
+                text = "ElderCare Guardian",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -489,7 +495,7 @@ private fun MetricCard(label: String, value: String, unit: String, modifier: Mod
 }
 
 @Composable
-private fun WorkoutPanel(frame: SensorFrame) {
+private fun SafetyPanel(frame: SensorFrame) {
     Card(
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -501,14 +507,14 @@ private fun WorkoutPanel(frame: SensorFrame) {
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SectionTitle("Workout")
+            SectionTitle("Safety")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                MetricCard("Reps", frame.reps.toString(), "total", Modifier.weight(1f))
-                MetricCard("Form", "%.1f".format(frame.formScore), "/10", Modifier.weight(1f))
+                MetricCard("Fall risk", frame.fallRisk.name, "", Modifier.weight(1f))
+                MetricCard("SOS", if (frame.sosActive) "Active" else "Off", "", Modifier.weight(1f))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatusPill(label = frame.posture.name, status = frame.posture)
-                StatusPill(label = frame.dehydration.name, status = frame.dehydration)
+                StatusPill(label = frame.caregiverAlert.name, status = frame.caregiverAlert)
             }
         }
     }
@@ -527,16 +533,16 @@ private fun MotionPanel(frame: SensorFrame) {
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SectionTitle("Motion intelligence")
-            SignalRow("Form confidence", "%.0f%%".format(frame.formScore * 10f), frame.formScore / 10f)
+            SectionTitle("Motion safety")
+            SignalRow("Fall risk", frame.fallRisk.name, riskProgress(frame.fallRisk))
             SignalRow("Posture stability", frame.posture.name, postureProgress(frame.posture))
-            SignalRow("Fatigue status", frame.fatigue.name, fatigueProgress(frame.fatigue))
+            SignalRow("Inactivity", "${frame.inactivityMinutes} min", (frame.inactivityMinutes / 30f).coerceIn(0f, 1f))
         }
     }
 }
 
 @Composable
-private fun PowerPanel(frame: SensorFrame) {
+private fun CaregiverPanel(frame: SensorFrame) {
     Card(
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -548,35 +554,18 @@ private fun PowerPanel(frame: SensorFrame) {
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SectionTitle("Power")
+            SectionTitle("Caregiver alert")
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                MetricCard("TEG", "%.1f".format(frame.tegPowerMw), "mW", Modifier.weight(1f))
-                MetricCard("Solar", "%.1f".format(frame.solarPowerMw), "mW", Modifier.weight(1f))
+                MetricCard("Status", frame.caregiverAlert.name, "", Modifier.weight(1f))
+                MetricCard("Check-in", if (frame.sosActive) "Needed" else "OK", "", Modifier.weight(1f))
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Supercap", color = Color(0xFF475569), style = MaterialTheme.typography.bodyMedium)
-                Text("${frame.supercapPercent}%", color = Color(0xFF334155), style = MaterialTheme.typography.labelLarge)
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(5.dp))
-                    .background(Color(0xFFE2E8F0))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(frame.supercapPercent / 100f)
-                        .height(10.dp)
-                        .background(Color(0xFF2563EB))
-                )
-            }
+            StatusPill(label = frame.caregiverAlert.name, status = frame.caregiverAlert)
         }
     }
 }
 
 @Composable
-private fun PowerStrategyPanel(frame: SensorFrame) {
+private fun DailyStatusPanel(frame: SensorFrame) {
     Card(
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -588,10 +577,10 @@ private fun PowerStrategyPanel(frame: SensorFrame) {
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SectionTitle("Energy strategy")
-            SignalRow("Supercap reserve", "${frame.supercapPercent}%", frame.supercapPercent / 100f)
-            SignalRow("Burst cycle readiness", if (frame.supercapPercent >= 65) "Ready" else "Charging", frame.supercapPercent / 100f)
-            SignalRow("TEG contribution", "%.1f mW".format(frame.tegPowerMw), (frame.tegPowerMw / 8f).coerceIn(0f, 1f))
+            SectionTitle("Daily status")
+            SignalRow("Hydration risk", frame.dehydration.name, riskProgress(frame.dehydration))
+            SignalRow("Breathing trend", "${frame.respiratoryRate} breaths/min", 0.55f)
+            SignalRow("Device battery", "${frame.supercapPercent}%", frame.supercapPercent / 100f)
         }
     }
 }
@@ -616,7 +605,7 @@ private fun ReadinessPanel(
             ChecklistRow("Demo data stream", true)
             ChecklistRow("Runtime permissions", missingPermissions.isEmpty())
             ChecklistRow("BLE contract defined", true)
-            ChecklistRow("SmartSuit_v1 connected", bleConnectionState == BleConnectionState.Connected)
+            ChecklistRow("ElderCare_v1 connected", bleConnectionState == BleConnectionState.Connected)
             ChecklistRow("Samsung SDK AAR installed", false)
             ChecklistRow("Partner approval received", false)
         }
@@ -628,6 +617,7 @@ private fun BleConnectionPanel(
     missingPermissions: List<String>,
     bleConnectionState: BleConnectionState,
     discoveredDevices: List<DiscoveredBleDevice>,
+    bleTelemetry: SmartSuitBleTelemetry,
     onRequestPermissions: () -> Unit,
     onStartBleScan: () -> Unit,
     onStopBle: () -> Unit,
@@ -656,7 +646,7 @@ private fun BleConnectionPanel(
             }
 
             Text(
-                text = "Scanner looks for SmartSuit_v1. Sensor frames stay on simulator until firmware exposes the custom GATT stream.",
+                text = "Scanner looks for ElderCare_v1. Sensor frames stay on simulator until firmware exposes the custom GATT stream.",
                 color = Color(0xFF64748B),
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -686,7 +676,7 @@ private fun BleConnectionPanel(
 
             if (discoveredDevices.isEmpty()) {
                 Text(
-                    text = "No SmartSuit_v1 advertisements yet.",
+                    text = "No ElderCare_v1 advertisements yet.",
                     color = Color(0xFF94A3B8),
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -695,7 +685,43 @@ private fun BleConnectionPanel(
                     DeviceRow(device)
                 }
             }
+
+            HorizontalDivider(color = Color(0xFFE2E8F0))
+            BleTelemetrySummary(bleTelemetry)
         }
+    }
+}
+
+@Composable
+private fun BleTelemetrySummary(telemetry: SmartSuitBleTelemetry) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle("GATT telemetry")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            TelemetryChip("HR", telemetry.heartRateBpm?.toString() ?: "--", Modifier.weight(1f))
+            TelemetryChip("Battery", telemetry.batteryPercent?.let { "$it%" } ?: "--", Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            TelemetryChip("ECG", telemetry.ecgSamples.size.toString(), Modifier.weight(1f))
+            TelemetryChip("Power", telemetry.powerMw?.let { "%.1f".format(it) } ?: "--", Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            TelemetryChip("Humidity", telemetry.humidityPercent?.let { "%.1f".format(it) } ?: "--", Modifier.weight(1f))
+            TelemetryChip("Resp", telemetry.respiratoryRate?.let { "%.1f".format(it) } ?: "--", Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun TelemetryChip(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color(0xFFF8FAFC))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(label, color = Color(0xFF64748B), style = MaterialTheme.typography.labelSmall)
+        Text(value, color = Color(0xFF0F172A), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -836,7 +862,9 @@ private fun fatigueProgress(status: FatigueStatus): Float = when (status) {
 private fun StatusPill(label: String, status: Any) {
     val color = when (status) {
         PostureStatus.Bad, FatigueStatus.Stop, RiskStatus.High -> Color(0xFFB91C1C)
+        CaregiverAlertStatus.Urgent -> Color(0xFFB91C1C)
         PostureStatus.Warning, FatigueStatus.Caution, RiskStatus.Medium -> Color(0xFFB45309)
+        CaregiverAlertStatus.Check -> Color(0xFFB45309)
         else -> Color(0xFF0F766E)
     }
 

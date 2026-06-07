@@ -1,23 +1,18 @@
 # Hardware
 
-Hardware work is split into bench validation and wearable integration.
+Hardware work is split into bench validation and a simple elder-care wearable prototype.
 
 ## Bench Validation
 
-- TEG to boost converter to supercap.
-- Flexible solar panel supplement.
-- Piezo shoe insert supplement.
-- AD8232 ECG module.
 - MAX30102 SpO2 and heart rate.
-- MPU-6050 or ICM-42688 IMUs.
+- MPU-6050 or ICM-42688 IMU for fall and inactivity detection.
 - TMP117 skin temperature.
-- SHT40 humidity/sweat.
+- Push button or capacitive touch input for SOS.
 
 ## Wearable Integration
 
-- Upper-back TEG contact pad.
-- Shoulder solar panel routing.
-- Removable module connectors for washing.
-- Elbow and lumbar IMU mounting.
-- Wrist cuff optical sensor mount.
-- Waistband MCU/power pouch.
+- Wrist band or clip enclosure.
+- Optical sensor skin contact window.
+- IMU mounted firmly to avoid loose-device false positives.
+- USB rechargeable battery or small LiPo for the showcase.
+- Optional removable strap for comfort testing.

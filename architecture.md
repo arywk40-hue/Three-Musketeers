@@ -1,6 +1,8 @@
-# Smart Workout Suit — System Architecture
+# ElderCare Guardian — System Architecture
 **Team:** Pranay · Ariyan · Reman Dey  
 **Version:** 1.0 | **Date:** June 2026
+
+> Current direction: elderly safety and health monitoring wearable. Older smart-suit, fabric, and energy-harvesting sections are retained as background only and are superseded by `docs/elder-care-pivot.md`.
 
 ---
 
@@ -138,7 +140,7 @@ Standard SIG services (Samsung Health recognises automatically via Accessory SDK
 
 ```
 0x1800  Generic Access
-  0x2A00  Device Name = "SmartSuit_v1"
+  0x2A00  Device Name = "ElderCare_v1"
 
 0x180F  Battery Service
   0x2A19  Battery Level [0–100%]     ← derived from supercap voltage
@@ -177,61 +179,61 @@ Custom vendor service (UUID: `12345678-1234-5678-1234-567812345678`):
 ```
 Android App
 ├── BLEManager
-│   ├── scan for "SmartSuit_v1"
+│   ├── scan for "ElderCare_v1"
 │   ├── GATT connect + MTU negotiate (512 bytes for ECG window)
 │   ├── subscribe all characteristic notifications
 │   └── parse binary frames → SensorFrame data class
 │
 ├── SamsungHealthManager
-│   ├── HealthDataStore connect
-│   ├── write HR, SpO2, BP, Temp to Samsung Health (Data SDK)
+│   ├── HealthDataService DataStore bridge
+│   ├── write HR, SpO2, BP, Temp to Samsung Health (Data SDK local AAR)
 │   ├── read historical data for History screen
 │   └── handle consent permission flow (required by Samsung)
 │
-├── MLEngine
-│   ├── ECGAnomalyModel.tflite       (1D-CNN)
-│   ├── RepCounterModel.tflite       (LSTM)
-│   ├── FormScorerModel.tflite       (LSTM → regression)
-│   ├── DehydrationModel.tflite      (Random Forest → tflite)
-│   └── OverexertionModel.tflite     (XGBoost → tflite)
+├── SafetyEngine
+│   ├── ECGAnomalyModel.tflite       (1D-CNN, optional)
+│   ├── FallDetector.tflite          (IMU classifier or rule engine)
+│   ├── InactivityMonitor            (rule engine)
+│   ├── VitalsRiskModel.tflite       (tabular risk classifier, optional)
+│   └── CaregiverAlertPolicy         (local triage rules)
 │
 └── UI (Jetpack Compose)
-    ├── HomeScreen     — ECG waveform + vitals cards
-    ├── WorkoutScreen  — rep counter + form score + posture indicator
-    ├── HealthScreen   — BP, hydration score, fatigue index, alerts
-    ├── PowerScreen    — live power gauges (TEG, solar, cap level)
-    └── HistoryScreen  — Samsung Health data timeline
+    ├── VitalsScreen    — ECG waveform + HR, SpO2, RR cards
+    ├── SafetyScreen    — fall risk, SOS, inactivity, posture state
+    ├── CaregiverScreen — alert level, contact status, last check-in
+    └── ReadinessScreen — BLE, Samsung Health bridge, device battery
 ```
 
 ### Samsung Health Data SDK integration
 
 ```kotlin
-// 1. Connect to Samsung Health service
-val store = HealthDataStore(context, object : HealthDataStore.ConnectionListener {
-    override fun onConnected() { onHealthStoreReady() }
-    override fun onConnectionFailed(error: HealthConnectionErrorResult) { }
-    override fun onDisconnected() { }
-})
-store.connectService()
+// 1. Samsung Health Data SDK is a local AAR from Samsung Developer Portal.
+implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("samsung-health-data-api*.aar"))))
 
-// 2. Request permissions (user must grant in Samsung Health app)
+// 2. Get the current Data SDK store.
+val healthDataStore = HealthDataService.getStore(applicationContext)
+
+// 3. Request permissions (user must grant in Samsung Health app)
 val permissions = setOf(
-    HealthPermission(HealthConstants.HeartRate.HEALTH_DATA_TYPE, UPDATE),
-    HealthPermission(HealthConstants.SpO2.HEALTH_DATA_TYPE, UPDATE),
-    HealthPermission(HealthConstants.BloodPressure.HEALTH_DATA_TYPE, UPDATE),
-    HealthPermission(HealthConstants.BodyTemperature.HEALTH_DATA_TYPE, UPDATE)
+    Permission.of(DataTypes.HEART_RATE, AccessType.WRITE),
+    Permission.of(DataTypes.BLOOD_OXYGEN, AccessType.WRITE),
+    Permission.of(DataTypes.BLOOD_PRESSURE, AccessType.WRITE),
+    Permission.of(DataTypes.BODY_TEMPERATURE, AccessType.WRITE),
 )
-HealthDataService.requestPermissions(permissions, activity) { result -> }
 
-// 3. Write data sample
-val inserter = HealthDataResolver(store, null).requestForInsert(HeartRate.HEALTH_DATA_TYPE)
-val data = HealthData().apply {
-    putInt(HeartRate.HEART_RATE, 72)
-    putLong(HeartRate.START_TIME, System.currentTimeMillis())
-    putLong(HeartRate.TIME_OFFSET, TimeZone.getDefault().rawOffset.toLong())
-}
-inserter.request.put(data)
-inserter.flush()
+// 4. Write data sample
+val dataPoint = HealthDataPoint.builder()
+    .setStartTime(startTime)
+    .setEndTime(endTime)
+    .setDeviceId(registeredSmartSuitDeviceId)
+    .addFieldData(DataType.HeartRateType.HEART_RATE, latestHR)
+    .build()
+
+val request = DataTypes.HEART_RATE.insertDataRequestBuilder
+    .addData(dataPoint)
+    .build()
+
+healthDataStore.insertData(request)
 ```
 
 ### Samsung Health Accessory SDK — BLE device registration
@@ -264,22 +266,19 @@ Target metric: Macro F1 > 0.85
 TFLite size: ~150 KB
 ```
 
-### Model 2 — Rep Counter + Form Scorer
+### Model 2 — Fall And Inactivity Detection
 
 ```
-Input:  IMU window (2 seconds × 200 Hz = 400 samples × 6 axes)
-        float32[400][6] — from whichever elbow is active
+Input:  IMU window (2 seconds x 100-200 Hz x 6 axes)
+        float32 window from wrist or clip wearable
 
-Rep counter model (LSTM):
-        LSTM(64) → LSTM(32) → Dense(1, sigmoid)
-        Output: rep boundary probability (peak detection above 0.6)
+Prototype rule engine:
+        high acceleration spike + orientation change + low movement after impact
 
-Form scorer model (LSTM → regression):
-        LSTM(64) → Dense(32) → Dense(1, linear)
-        Output: form score [0.0 – 10.0]
-        Trigger alert if score < 6.0
+Optional ML model:
+        CNN/LSTM -> Normal / PossibleFall / ConfirmedFall
 
-Training data: self-collected workout sessions with video-sync labels
+Training data: public fall datasets + staged non-harmful motion tests
 ```
 
 ### Model 3 — Dehydration Risk

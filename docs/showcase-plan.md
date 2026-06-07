@@ -1,34 +1,33 @@
-# One Month Showcase Plan
+# One Month Elder-Care Showcase Plan
 
 ## Week 1
 
-Goal: Make the app feel real and make the hardware testable.
+Goal: Make the elder-safety app feel real and make the wearable testable.
 
 - Scaffold Android app. `Started`
 - Build simulator-backed live dashboard. `Started`
 - Define BLE data model and packet contract. `Started`
-- Validate AD8232 ECG and MAX30102 separately.
-- Start TEG to boost converter bench setup.
+- Validate MAX30102 and one IMU separately.
+- Define fall/SOS/caregiver alert states.
 
 Deliverable:
-- Phone screen shows believable live health and power metrics.
-- Serial logs exist for at least ECG or SpO2.
+- Phone screen shows believable live health and safety metrics.
+- Serial logs exist for HR/SpO2 or IMU motion.
 
 Current app checkpoint:
 - `apps/android` opens as the Android project root.
-- Dashboard has Vitals, Workout, Power, and Readiness tabs.
-- Demo mode streams live simulated ECG, vitals, workout, and power data.
-- BLE mode has runtime permission handling, scan/stop/connect controls, and a discovered-device list for `SmartSuit_v1`.
+- Dashboard pivots to Vitals, Safety, Caregiver, and Readiness tabs.
+- Demo mode streams live simulated vitals, fall risk, SOS, and alert data.
+- BLE mode has runtime permission handling, scan/stop/connect controls, and a discovered-device list for `ElderCare_v1`.
 
 ## Week 2
 
-Goal: Connect at least one real sensor path.
+Goal: Connect at least one real elder-safety sensor path.
 
 - Implement BLE scan/connect skeleton.
 - Stream one sensor value from ESP32-C3 to app.
-- Add ECG chart placeholder or waveform rendering path.
-- Validate one IMU motion stream.
-- Measure supercap charge/discharge under TEG/solar.
+- Validate IMU fall gesture stream.
+- Add caregiver alert state to UI.
 
 Deliverable:
 - App can show either simulator metrics or one live BLE metric.
@@ -37,9 +36,9 @@ Deliverable:
 
 Goal: Make the pitch demo coherent.
 
-- Add rep counter demo flow.
-- Add posture/fatigue/dehydration rule-based alerts.
-- Add power screen with TEG/solar/supercap fields.
+- Add fall/SOS demo flow.
+- Add inactivity and abnormal-vitals rule-based alerts.
+- Add caregiver alert timeline.
 - Package firmware demo with fixed GATT service names.
 - Prepare fallback simulator recording for pitch reliability.
 
@@ -61,9 +60,8 @@ Deliverable:
 
 ## Pitch Demo Script
 
-1. Open Smart Suit app.
-2. Show live vitals and ECG waveform.
-3. Do 10 curls and show rep count/form score.
-4. Cover solar panels and show power still flowing from TEG.
-5. Trigger posture/fatigue alert.
-6. Explain Samsung Health deployment path.
+1. Open ElderCare Guardian app.
+2. Show live HR, SpO2, temperature, and motion state.
+3. Trigger simulated fall or SOS event.
+4. Show caregiver alert and acknowledgement flow.
+5. Show BLE readiness and Samsung Health deployment path.

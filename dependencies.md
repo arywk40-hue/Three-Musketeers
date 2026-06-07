@@ -1,6 +1,6 @@
-# Smart Workout Suit — Dependencies Reference
+# ElderCare Guardian — Dependencies Reference
 **Last verified against Samsung docs:** June 2026  
-**Purpose:** Full dependency list for the Android app — paste this into LLM context when building
+**Purpose:** Full dependency list for the ElderCare Guardian Android app — paste this into LLM context when building
 
 ---
 
@@ -622,7 +622,7 @@ fun BlePermissionGate(content: @Composable () -> Unit) {
 ## Version Summary (paste this as LLM context header)
 
 ```
-# Smart Workout Suit — Dependency Versions (as of June 2026)
+# ElderCare Guardian — Dependency Versions (as of June 2026)
 Samsung Health Data SDK:    v1.1.0  (local AAR, from Samsung Developer Portal)
 Samsung Health Sensor SDK:  v1.4.1  (local AAR, Galaxy Watch only)
 Samsung Health app minimum: 6.30.2

@@ -9,13 +9,13 @@ data class SensorFrame(
     val skinTempC: Float,
     val humidityPercent: Float,
     val respiratoryRate: Int,
-    val reps: Int,
-    val formScore: Float,
     val posture: PostureStatus,
     val fatigue: FatigueStatus,
     val dehydration: RiskStatus,
-    val tegPowerMw: Float,
-    val solarPowerMw: Float,
+    val fallRisk: RiskStatus,
+    val caregiverAlert: CaregiverAlertStatus,
+    val sosActive: Boolean,
+    val inactivityMinutes: Int,
     val supercapPercent: Int,
     val ecgSamples: List<Float>,
 )
@@ -36,4 +36,10 @@ enum class RiskStatus {
     Low,
     Medium,
     High,
+}
+
+enum class CaregiverAlertStatus {
+    Normal,
+    Check,
+    Urgent,
 }
