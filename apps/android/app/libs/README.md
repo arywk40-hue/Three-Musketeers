@@ -1,8 +1,12 @@
 # Local SDK AARs
 
-Place Samsung SDK AAR files here after downloading them from the Samsung Developer Portal.
+Place required local SDK AARs here for health and connectivity integrations used by the app.
 
-Expected:
-- `samsung-health-data-api-*.aar`
+## Expected Categories
+- Health platform integration SDKs
+- Optional analytics/encryption helper SDKs
+- Vendor-specific wearable interoperability SDKs
 
-The app scaffold compiles its simulator path without importing Samsung classes. The real Samsung bridge should be enabled only after the AAR is present and partner/developer-mode access is ready.
+## Notes
+- Keep versioned filenames and track checksum/source in internal build notes.
+- Do not commit secrets or private keys in this directory.

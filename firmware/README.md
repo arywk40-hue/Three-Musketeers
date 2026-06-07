@@ -1,15 +1,23 @@
-# Firmware
+# Firmware Scope
 
-Firmware will expose the SmartSuit BLE profile from the MCU.
+Firmware must turn wearable sensor streams into real-time health and safety intelligence.
 
-Prototype target:
-- ESP32-C3 with ESP-IDF.
+## Runtime Responsibilities
+- Continuous sensor acquisition and normalization.
+- Feature extraction for health, gait, posture, mobility, and environment.
+- Real-time inference hooks for ML alert classes.
+- BLE transmission to mobile app with low-latency risk updates.
 
-Product target:
-- nRF5340 with Zephyr RTOS.
+## Safety Logic
+- Trigger preventive vibration alerts on elevated fall-risk states.
+- Trigger emergency state on fall/unconsciousness/critical vital anomalies.
+- Package emergency payload with timestamped telemetry snapshots.
 
-Immediate firmware milestones:
-- Advertise as `SmartSuit_v1`.
-- Expose standard Heart Rate service for early app testing.
-- Add custom SmartSuit service UUID `12345678-1234-5678-1234-567812345678`.
-- Stream one real sensor first, then expand to ECG, IMU, humidity, respiratory rate, and power telemetry.
+## Target Alert Classes
+- ECG anomaly: Normal / AFib / Tachycardia / Bradycardia
+- Fall risk: Low / Medium / High
+- Dehydration risk: Low / Medium / High
+- Mobility decline: Stable / Declining / Critical
+- Fatigue level: Safe / Caution / High Risk
+- Cognitive decline: Normal / Monitor / Concern
+- Sleep quality: Good / Fair / Poor

@@ -1,19 +1,34 @@
-# ML
+# ML Scope
 
-ML starts with rule-based showcase alerts and evolves into validated on-device models.
+## ML Capability Map
 
-## Showcase
+### Health Models
+- ECG anomaly detection
+- Dehydration risk prediction
+- Fatigue level assessment
+- Sleep quality assessment
 
-- Rep count from IMU peaks.
-- Form score from rule thresholds.
-- Dehydration from humidity, temperature, and HR trend.
-- Fatigue from HR, SpO2, respiratory rate, and IMU intensity.
+### Mobility & Fall Models
+- Fall risk prediction
+- Abnormal gait pattern detection
+- Mobility decline detection
+- Gait personalization and symmetry analysis
 
-## Product
+### Cognitive & Behavior Models
+- Daily routine drift detection
+- Cognitive decline indicator scoring
+- Social isolation and activity reduction signals
 
-- ECG anomaly: 1D-CNN converted to TFLite.
-- Rep counter: LSTM or temporal CNN.
-- Form scorer: regression model.
-- Dehydration: Random Forest or small neural tabular model.
-- Overexertion: XGBoost/SVM/TFLite-compatible classifier.
-- BP estimation: calibrated PPG/ECG feature model.
+## Standard Output Classes
+- ECG anomaly: Normal / AFib / Tachycardia / Bradycardia
+- Fall risk: Low / Medium / High
+- Dehydration risk: Low / Medium / High
+- Mobility decline: Stable / Declining / Critical
+- Fatigue: Safe / Caution / High Risk
+- Cognitive decline: Normal / Monitor / Concern
+- Sleep quality: Good / Fair / Poor
+
+## Deployment Expectations
+- On-device inference for low-latency risk response.
+- Cloud-assisted trend analytics for long-term prediction.
+- Explainable risk summaries for caregiver dashboard consumption.
