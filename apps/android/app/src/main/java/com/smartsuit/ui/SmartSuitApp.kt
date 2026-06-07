@@ -57,6 +57,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.smartsuit.ble.BleConnectionState
 import com.smartsuit.ble.DiscoveredBleDevice
 import com.smartsuit.ble.SmartSuitBleTelemetry
+import com.smartsuit.data.AlertEvent
 import com.smartsuit.data.CaregiverAlertStatus
 import com.smartsuit.data.EcgAnomalyStatus
 import com.smartsuit.data.FatigueStatus
@@ -65,6 +66,9 @@ import com.smartsuit.data.RiskStatus
 import com.smartsuit.data.SensorFrame
 import com.smartsuit.permissions.SmartSuitPermissions
 import com.smartsuit.samsung.SamsungHealthState
+import com.smartsuit.ui.components.AlertTimeline
+import com.smartsuit.ui.components.TrendChart
+import com.smartsuit.ui.components.UrgentAlertBanner
 
 @Composable
 fun SmartSuitApp(
@@ -75,6 +79,11 @@ fun SmartSuitApp(
     val discoveredDevices by smartSuitViewModel.discoveredDevices.collectAsState()
     val bleTelemetry by smartSuitViewModel.bleTelemetry.collectAsState()
     val samsungState by smartSuitViewModel.samsungState.collectAsState()
+    val sosOverride by smartSuitViewModel.sosOverride.collectAsState()
+    val acknowledgedUrgent by smartSuitViewModel.acknowledgedUrgent.collectAsState()
+    val alertHistory by smartSuitViewModel.alertHistory.collectAsState()
+    val hrTrend by smartSuitViewModel.hrTrend.collectAsState()
+    val spo2Trend by smartSuitViewModel.spo2Trend.collectAsState()
     val permissionController = rememberPermissionController()
     var selectedTab by remember { mutableStateOf(AppTab.Vitals) }
     var sessionMode by remember { mutableStateOf(SessionMode.Demo) }
@@ -104,10 +113,18 @@ fun SmartSuitApp(
                     discoveredDevices = discoveredDevices,
                     bleTelemetry = bleTelemetry,
                     samsungState = samsungState,
+                    sosOverride = sosOverride,
+                    acknowledgedUrgent = acknowledgedUrgent,
+                    alertHistory = alertHistory,
+                    hrTrend = hrTrend,
+                    spo2Trend = spo2Trend,
                     onStartBleScan = smartSuitViewModel::startBleScan,
                     onStopBle = smartSuitViewModel::stopBle,
                     onConnectFirstDevice = smartSuitViewModel::connectToFirstDiscoveredDevice,
                     onStartSamsung = smartSuitViewModel::startSamsungBridge,
+                    onTriggerSosDemo = smartSuitViewModel::triggerSosDemo,
+                    onClearSosDemo = smartSuitViewModel::clearSosDemo,
+                    onAcknowledgeUrgent = smartSuitViewModel::acknowledgeUrgent,
                 )
             } ?: LoadingScreen()
         }
@@ -181,10 +198,18 @@ private fun AppShell(
     discoveredDevices: List<DiscoveredBleDevice>,
     bleTelemetry: SmartSuitBleTelemetry,
     samsungState: SamsungHealthState,
+    sosOverride: Boolean,
+    acknowledgedUrgent: Boolean,
+    alertHistory: List<AlertEvent>,
+    hrTrend: List<Float>,
+    spo2Trend: List<Float>,
     onStartBleScan: () -> Unit,
     onStopBle: () -> Unit,
     onConnectFirstDevice: () -> Unit,
     onStartSamsung: () -> Unit,
+    onTriggerSosDemo: () -> Unit,
+    onClearSosDemo: () -> Unit,
+    onAcknowledgeUrgent: () -> Unit,
 ) {
     Scaffold(
         bottomBar = {
@@ -218,6 +243,14 @@ private fun AppShell(
             item {
                 ModeNotice(sessionMode)
             }
+            if (frame.caregiverAlert == CaregiverAlertStatus.Urgent && !acknowledgedUrgent) {
+                item {
+                    UrgentAlertBanner(
+                        latestEvent = alertHistory.firstOrNull(),
+                        onAcknowledge = onAcknowledgeUrgent,
+                    )
+                }
+            }
             if (missingPermissions.isNotEmpty()) {
                 item {
                     PermissionNotice(
@@ -231,16 +264,45 @@ private fun AppShell(
                     item { EcgPanel(frame.ecgSamples) }
                     item { EcgAnomalyCard(frame.ecgAnomaly) }
                     item { MetricGrid(frame) }
+                    item {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            TrendChart(
+                                label = "HR trend",
+                                values = hrTrend,
+                                unit = "bpm",
+                                lineColor = Color(0xFFDC2626),
+                                modifier = Modifier.weight(1f),
+                            )
+                            TrendChart(
+                                label = "SpO₂ trend",
+                                values = spo2Trend,
+                                unit = "%",
+                                lineColor = Color(0xFF2563EB),
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
                     item { HealthPanel(frame) }
                 }
                 AppTab.Safety -> {
-                    item { SafetyPanel(frame) }
+                    item {
+                        SafetyPanel(
+                            frame = frame,
+                            sosOverride = sosOverride,
+                            onTriggerSosDemo = onTriggerSosDemo,
+                            onClearSosDemo = onClearSosDemo,
+                        )
+                    }
                     item { MotionPanel(frame) }
                     item { VitalsRiskPanel(frame) }
                 }
                 AppTab.Caregiver -> {
                     item { CaregiverPanel(frame) }
                     item { DailyStatusPanel(frame) }
+                    item { AlertTimeline(events = alertHistory) }
                 }
                 AppTab.Readiness -> {
                     item {
@@ -522,7 +584,12 @@ private fun MetricCard(label: String, value: String, unit: String, modifier: Mod
 }
 
 @Composable
-private fun SafetyPanel(frame: SensorFrame) {
+private fun SafetyPanel(
+    frame: SensorFrame,
+    sosOverride: Boolean,
+    onTriggerSosDemo: () -> Unit,
+    onClearSosDemo: () -> Unit,
+) {
     Card(
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -546,6 +613,26 @@ private fun SafetyPanel(frame: SensorFrame) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatusPill(label = "Fatigue ${frame.fatigue.name}", status = frame.fatigue)
             }
+            HorizontalDivider(color = Color(0xFFE2E8F0))
+            val sosButtonColor = if (sosOverride) Color(0xFFB91C1C) else Color(0xFF0F766E)
+            Button(
+                onClick = if (sosOverride) onClearSosDemo else onTriggerSosDemo,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = sosButtonColor),
+            ) {
+                Text(
+                    text = if (sosOverride) "Clear SOS Demo" else "Trigger SOS (Demo)",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                text = "Demo trigger — simulates an emergency event",
+                color = Color(0xFF94A3B8),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(top = 2.dp),
+            )
         }
     }
 }
