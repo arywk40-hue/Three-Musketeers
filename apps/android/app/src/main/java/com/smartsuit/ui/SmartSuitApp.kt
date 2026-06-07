@@ -26,6 +26,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import kotlin.math.sqrt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -57,11 +58,13 @@ import com.smartsuit.ble.BleConnectionState
 import com.smartsuit.ble.DiscoveredBleDevice
 import com.smartsuit.ble.SmartSuitBleTelemetry
 import com.smartsuit.data.CaregiverAlertStatus
+import com.smartsuit.data.EcgAnomalyStatus
 import com.smartsuit.data.FatigueStatus
 import com.smartsuit.data.PostureStatus
 import com.smartsuit.data.RiskStatus
 import com.smartsuit.data.SensorFrame
 import com.smartsuit.permissions.SmartSuitPermissions
+import com.smartsuit.samsung.SamsungHealthState
 
 @Composable
 fun SmartSuitApp(
@@ -71,6 +74,7 @@ fun SmartSuitApp(
     val bleConnectionState by smartSuitViewModel.bleConnectionState.collectAsState()
     val discoveredDevices by smartSuitViewModel.discoveredDevices.collectAsState()
     val bleTelemetry by smartSuitViewModel.bleTelemetry.collectAsState()
+    val samsungState by smartSuitViewModel.samsungState.collectAsState()
     val permissionController = rememberPermissionController()
     var selectedTab by remember { mutableStateOf(AppTab.Vitals) }
     var sessionMode by remember { mutableStateOf(SessionMode.Demo) }
@@ -99,9 +103,11 @@ fun SmartSuitApp(
                     bleConnectionState = bleConnectionState,
                     discoveredDevices = discoveredDevices,
                     bleTelemetry = bleTelemetry,
+                    samsungState = samsungState,
                     onStartBleScan = smartSuitViewModel::startBleScan,
                     onStopBle = smartSuitViewModel::stopBle,
                     onConnectFirstDevice = smartSuitViewModel::connectToFirstDiscoveredDevice,
+                    onStartSamsung = smartSuitViewModel::startSamsungBridge,
                 )
             } ?: LoadingScreen()
         }
@@ -174,9 +180,11 @@ private fun AppShell(
     bleConnectionState: BleConnectionState,
     discoveredDevices: List<DiscoveredBleDevice>,
     bleTelemetry: SmartSuitBleTelemetry,
+    samsungState: SamsungHealthState,
     onStartBleScan: () -> Unit,
     onStopBle: () -> Unit,
     onConnectFirstDevice: () -> Unit,
+    onStartSamsung: () -> Unit,
 ) {
     Scaffold(
         bottomBar = {
@@ -221,12 +229,14 @@ private fun AppShell(
             when (selectedTab) {
                 AppTab.Vitals -> {
                     item { EcgPanel(frame.ecgSamples) }
+                    item { EcgAnomalyCard(frame.ecgAnomaly) }
                     item { MetricGrid(frame) }
                     item { HealthPanel(frame) }
                 }
                 AppTab.Safety -> {
                     item { SafetyPanel(frame) }
                     item { MotionPanel(frame) }
+                    item { VitalsRiskPanel(frame) }
                 }
                 AppTab.Caregiver -> {
                     item { CaregiverPanel(frame) }
@@ -237,6 +247,13 @@ private fun AppShell(
                         ReadinessPanel(
                             missingPermissions = missingPermissions,
                             bleConnectionState = bleConnectionState,
+                            samsungState = samsungState,
+                        )
+                    }
+                    item {
+                        SamsungHealthPanel(
+                            samsungState = samsungState,
+                            onStartSamsung = onStartSamsung,
                         )
                     }
                     item {
@@ -433,8 +450,17 @@ private fun MetricGrid(frame: SensorFrame) {
             MetricCard("SpO2", "%.1f".format(frame.spo2Percent), "%", Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            MetricCard("BP", "${frame.systolicMmHg}/${frame.diastolicMmHg}", "mmHg", Modifier.weight(1f))
+            MetricCard(
+                label = "BP",
+                value = "${frame.systolicMmHg}/${frame.diastolicMmHg}",
+                unit = if (frame.bpEstimated) "est mmHg" else "mmHg",
+                modifier = Modifier.weight(1f),
+            )
             MetricCard("Temp", "%.1f".format(frame.skinTempC), "C", Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            MetricCard("Resp", "${frame.respiratoryRate}", "/min", Modifier.weight(1f))
+            MetricCard("HR reserve", "${frame.hrReservePercent}", "%", Modifier.weight(1f))
         }
     }
 }
@@ -455,6 +481,7 @@ private fun HealthPanel(frame: SensorFrame) {
             SectionTitle("Health")
             SignalRow("Respiratory rate", "${frame.respiratoryRate} breaths/min", 0.62f)
             SignalRow("Sweat humidity", "%.1f%%".format(frame.humidityPercent), frame.humidityPercent / 100f)
+            SignalRow("Sweat rate", "%.2f %%/min".format(frame.sweatRatePercentPerMin), (frame.sweatRatePercentPerMin / 2f).coerceIn(0f, 1f))
             SignalRow("Dehydration risk", frame.dehydration.name, riskProgress(frame.dehydration))
             HorizontalDivider(color = Color(0xFFE2E8F0))
             Text(
@@ -516,6 +543,9 @@ private fun SafetyPanel(frame: SensorFrame) {
                 StatusPill(label = frame.posture.name, status = frame.posture)
                 StatusPill(label = frame.caregiverAlert.name, status = frame.caregiverAlert)
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusPill(label = "Fatigue ${frame.fatigue.name}", status = frame.fatigue)
+            }
         }
     }
 }
@@ -537,6 +567,7 @@ private fun MotionPanel(frame: SensorFrame) {
             SignalRow("Fall risk", frame.fallRisk.name, riskProgress(frame.fallRisk))
             SignalRow("Posture stability", frame.posture.name, postureProgress(frame.posture))
             SignalRow("Inactivity", "${frame.inactivityMinutes} min", (frame.inactivityMinutes / 30f).coerceIn(0f, 1f))
+            SignalRow("IMU magnitude", "%.2f m/s²".format(frame.imuMagnitude), (frame.imuMagnitude / 25f).coerceIn(0f, 1f))
         }
     }
 }
@@ -580,6 +611,7 @@ private fun DailyStatusPanel(frame: SensorFrame) {
             SectionTitle("Daily status")
             SignalRow("Hydration risk", frame.dehydration.name, riskProgress(frame.dehydration))
             SignalRow("Breathing trend", "${frame.respiratoryRate} breaths/min", 0.55f)
+            SignalRow("HR reserve", "${frame.hrReservePercent}%", (frame.hrReservePercent / 100f).coerceIn(0f, 1f))
             SignalRow("Device battery", "${frame.supercapPercent}%", frame.supercapPercent / 100f)
         }
     }
@@ -589,6 +621,7 @@ private fun DailyStatusPanel(frame: SensorFrame) {
 private fun ReadinessPanel(
     missingPermissions: List<String>,
     bleConnectionState: BleConnectionState,
+    samsungState: SamsungHealthState,
 ) {
     Card(
         shape = RoundedCornerShape(8.dp),
@@ -606,8 +639,8 @@ private fun ReadinessPanel(
             ChecklistRow("Runtime permissions", missingPermissions.isEmpty())
             ChecklistRow("BLE contract defined", true)
             ChecklistRow("ElderCare_v1 connected", bleConnectionState == BleConnectionState.Connected)
-            ChecklistRow("Samsung SDK AAR installed", false)
-            ChecklistRow("Partner approval received", false)
+            ChecklistRow("Samsung SDK AAR installed", samsungState != SamsungHealthState.NeedsSdkAar)
+            ChecklistRow("Partner approval received", samsungState == SamsungHealthState.Ready)
         }
     }
 }
@@ -702,11 +735,21 @@ private fun BleTelemetrySummary(telemetry: SmartSuitBleTelemetry) {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             TelemetryChip("ECG", telemetry.ecgSamples.size.toString(), Modifier.weight(1f))
-            TelemetryChip("Power", telemetry.powerMw?.let { "%.1f".format(it) } ?: "--", Modifier.weight(1f))
+            TelemetryChip("SOS", if (telemetry.sosState) "ACTIVE" else "Off", Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             TelemetryChip("Humidity", telemetry.humidityPercent?.let { "%.1f".format(it) } ?: "--", Modifier.weight(1f))
             TelemetryChip("Resp", telemetry.respiratoryRate?.let { "%.1f".format(it) } ?: "--", Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            TelemetryChip(
+                "IMU mag",
+                if (telemetry.wristImu.size >= 3) {
+                    val a = telemetry.wristImu
+                    "%.2f m/s²".format(sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]))
+                } else "--",
+                Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -761,6 +804,134 @@ private fun DeviceRow(device: DiscoveredBleDevice) {
             Text(device.address, color = Color(0xFF64748B), style = MaterialTheme.typography.bodySmall)
         }
         Text("${device.rssi} dBm", color = Color(0xFF475569), style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun EcgAnomalyCard(status: EcgAnomalyStatus) {
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SectionTitle("ECG rhythm")
+                StatusPill(label = status.name, status = rhythmSeverity(status))
+            }
+            Text(
+                text = rhythmDescription(status),
+                color = Color(0xFF475569),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+private fun rhythmSeverity(status: EcgAnomalyStatus): RiskStatus = when (status) {
+    EcgAnomalyStatus.Normal, EcgAnomalyStatus.Unknown -> RiskStatus.Low
+    EcgAnomalyStatus.AFib -> RiskStatus.High
+    EcgAnomalyStatus.Tachycardia, EcgAnomalyStatus.Bradycardia -> RiskStatus.Medium
+}
+
+private fun rhythmDescription(status: EcgAnomalyStatus): String = when (status) {
+    EcgAnomalyStatus.Unknown -> "Not enough RR intervals yet — algorithm needs at least 4 beats."
+    EcgAnomalyStatus.Normal -> "Rhythm looks regular, RMSSD in expected range."
+    EcgAnomalyStatus.AFib -> "Irregular RR intervals — possible AFib, alert caregiver."
+    EcgAnomalyStatus.Tachycardia -> "Sustained HR ≥ 100 bpm — flag for review."
+    EcgAnomalyStatus.Bradycardia -> "Sustained HR ≤ 50 bpm — flag for review."
+}
+
+@Composable
+private fun VitalsRiskPanel(frame: SensorFrame) {
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SectionTitle("Vitals risk")
+            SignalRow("Composite risk", frame.vitalsRisk.name, riskProgress(frame.vitalsRisk))
+            SignalRow("Fatigue", frame.fatigue.name, fatigueProgress(frame.fatigue))
+            SignalRow("HR reserve", "${frame.hrReservePercent}%", (frame.hrReservePercent / 100f).coerceIn(0f, 1f))
+        }
+    }
+}
+
+@Composable
+private fun SamsungHealthPanel(
+    samsungState: SamsungHealthState,
+    onStartSamsung: () -> Unit,
+) {
+    val stateLabel = when (samsungState) {
+        SamsungHealthState.Ready -> "Ready to write"
+        SamsungHealthState.NeedsSdkAar -> "AAR missing"
+        SamsungHealthState.NeedsPermission -> "Permission needed"
+        SamsungHealthState.Disabled -> "Disabled"
+        SamsungHealthState.Error -> "Error"
+    }
+    val stateColor = when (samsungState) {
+        SamsungHealthState.Ready -> Color(0xFF0F766E)
+        SamsungHealthState.NeedsPermission, SamsungHealthState.Disabled -> Color(0xFFB45309)
+        else -> Color(0xFFB91C1C)
+    }
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SectionTitle("Samsung Health")
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(stateColor.copy(alpha = 0.12f))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        stateLabel,
+                        color = stateColor,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+            Text(
+                text = "Data SDK v1.1.0 is a local AAR — drop it into app/libs/ to activate. Writes happen on a 5 s cadence once permissions are granted in Samsung Health.",
+                color = Color(0xFF475569),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedButton(
+                onClick = onStartSamsung,
+                shape = RoundedCornerShape(6.dp),
+            ) {
+                Text("Request permission")
+            }
+        }
     }
 }
 

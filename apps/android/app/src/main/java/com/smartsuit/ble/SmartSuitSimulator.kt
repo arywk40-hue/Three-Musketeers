@@ -1,12 +1,22 @@
 package com.smartsuit.ble
 
-import com.smartsuit.data.FatigueStatus
 import com.smartsuit.data.CaregiverAlertStatus
+import com.smartsuit.data.FatigueStatus
 import com.smartsuit.data.PostureStatus
 import com.smartsuit.data.RiskStatus
 import com.smartsuit.data.SensorFrame
 import com.smartsuit.data.SmartSuitDataSource
+import com.smartsuit.ml.BloodPressureEstimator
+import com.smartsuit.ml.CaregiverAlertPolicy
+import com.smartsuit.ml.DehydrationRiskModel
+import com.smartsuit.ml.EcgAnomalyDetector
+import com.smartsuit.ml.FallDetectionEngine
+import com.smartsuit.ml.HeartRateExtractor
+import com.smartsuit.ml.InactivityMonitor
+import com.smartsuit.ml.OverexertionModel
+import com.smartsuit.ml.VitalsRiskMonitor
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 import kotlinx.coroutines.delay
@@ -16,57 +26,104 @@ import kotlinx.coroutines.flow.flow
 class SmartSuitSimulator : SmartSuitDataSource {
     override val frames: Flow<SensorFrame> = flow {
         var tick = 0
+        var inactivitySeconds = 0
 
         while (true) {
             tick += 1
 
             val dailyWave = sin(tick / 6.0)
-            val fallRisk = when {
-                tick % 37 in 32..36 -> RiskStatus.High
-                tick % 19 in 15..18 -> RiskStatus.Medium
-                else -> RiskStatus.Low
+            val baselineHr = 72.0 + dailyWave * 6.0
+            val heartRateBpm = (baselineHr + Random.nextDouble(-2.0, 2.0)).toInt()
+            val spo2Percent = (97.0f + Random.nextDouble(-0.4, 0.3).toFloat()).coerceIn(85f, 100f)
+            val skinTempC = (33.0f + (dailyWave * 0.4).toFloat() + Random.nextDouble(-0.2, 0.4).toFloat())
+                .coerceIn(31f, 39f)
+            val respiratoryRate = (15 + (dailyWave * 2).toInt() + Random.nextInt(-1, 2))
+                .coerceIn(6, 30)
+            val humidityPercent = (45f + (tick % 18) * 0.5f).coerceIn(20f, 90f)
+            val sweatRatePercentPerMin = (0.2f + (dailyWave * 0.4).toFloat() + Random.nextDouble(-0.1, 0.2).toFloat())
+                .coerceIn(0f, 3f)
+
+            val ax = 0.18f * sin(tick * 0.27)
+            val ay = 0.15f * cos(tick * 0.21)
+            val az = 9.81f + 0.20f * sin(tick * 0.13)
+            val gx = 1.2f * sin(tick * 0.11)
+            val gy = 1.0f * cos(tick * 0.09)
+            val gz = 0.8f * sin(tick * 0.07)
+            val imuMagnitude = InactivityMonitor.magnitude(ax, ay, az)
+
+            val fallHighWindow = tick % 47 in 41..46
+            val fallMediumWindow = tick % 19 in 15..18
+            val simulatedWristImu = if (fallHighWindow) {
+                listOf(22f, 1.2f, 5.1f, 90f, 12f, 5f)
+            } else if (fallMediumWindow) {
+                listOf(15f, 1.0f, 7.8f, 30f, 8f, 4f)
+            } else {
+                listOf(ax, ay, az, gx, gy, gz)
             }
-            val sosActive = tick % 41 in 38..40
-            val caregiverAlert = when {
-                sosActive || fallRisk == RiskStatus.High -> CaregiverAlertStatus.Urgent
-                fallRisk == RiskStatus.Medium || tick % 23 in 19..22 -> CaregiverAlertStatus.Check
-                else -> CaregiverAlertStatus.Normal
-            }
-            val ecg = List(ECG_SAMPLE_COUNT) { index ->
-                val x = index / ECG_SAMPLE_COUNT.toDouble()
-                val phase = (index + tick * 6) % ECG_BEAT_PERIOD_SAMPLES
-                val qrs = if (phase in 3..8) 0.85f else 0f
-                (0.08 * sin(2.0 * PI * x * 5.0) + qrs + Random.nextDouble(-0.03, 0.03)).toFloat()
+            val fall = FallDetectionEngine.assess(simulatedWristImu)
+            inactivitySeconds = InactivityMonitor.assess(imuMagnitude, inactivitySeconds)
+
+            val bp = BloodPressureEstimator.estimate(heartRateBpm, skinTempC)
+            val vitalsRisk = VitalsRiskMonitor.assess(heartRateBpm, spo2Percent, respiratoryRate, skinTempC)
+            val dehydration = DehydrationRiskModel.assess(sweatRatePercentPerMin, skinTempC, heartRateBpm)
+            val overexertion = OverexertionModel.assess(heartRateBpm, spo2Percent, respiratoryRate, imuMagnitude)
+            val heartRateFromEcg = HeartRateExtractor.extractRrIntervals(buildEcgWindow(tick, heartRateBpm))
+
+            val ecgSamples = buildEcgWindow(tick, heartRateFromEcg.meanHrBpm ?: heartRateBpm)
+            val ecg = EcgAnomalyDetector.assess(ecgSamples, heartRateBpm)
+
+            val posture = when (fall.riskStatus) {
+                RiskStatus.High -> PostureStatus.Bad
+                RiskStatus.Medium -> PostureStatus.Warning
+                RiskStatus.Low -> PostureStatus.Good
             }
 
-            emit(
-                SensorFrame(
-                    timestampMillis = System.currentTimeMillis(),
-                    heartRateBpm = 76 + (dailyWave * 8).toInt(),
-                    spo2Percent = 97.4f + Random.nextDouble(-0.3, 0.2).toFloat(),
-                    systolicMmHg = 124 + (dailyWave * 5).toInt(),
-                    diastolicMmHg = 78 + (dailyWave * 2).toInt(),
-                    skinTempC = 33.1f + Random.nextDouble(-0.2, 0.4).toFloat(),
-                    humidityPercent = 49f + (tick % 18) * 0.4f,
-                    respiratoryRate = 15 + (dailyWave * 2).toInt(),
-                    posture = if (fallRisk == RiskStatus.High) PostureStatus.Bad else if (fallRisk == RiskStatus.Medium) PostureStatus.Warning else PostureStatus.Good,
-                    fatigue = if (caregiverAlert == CaregiverAlertStatus.Urgent) FatigueStatus.Stop else if (caregiverAlert == CaregiverAlertStatus.Check) FatigueStatus.Caution else FatigueStatus.Safe,
-                    dehydration = if (tick > 42) RiskStatus.Medium else RiskStatus.Low,
-                    fallRisk = fallRisk,
-                    caregiverAlert = caregiverAlert,
-                    sosActive = sosActive,
-                    inactivityMinutes = if (tick % 31 > 24) tick % 31 else 0,
-                    supercapPercent = (72 + (sin(tick / 8.0) * 8).toInt()).coerceIn(0, 100),
-                    ecgSamples = ecg,
-                )
+            val sosActive = tick % 53 in 49..52
+            val frame = SensorFrame(
+                timestampMillis = System.currentTimeMillis(),
+                heartRateBpm = heartRateBpm,
+                spo2Percent = spo2Percent,
+                systolicMmHg = bp.systolicMmHg,
+                diastolicMmHg = bp.diastolicMmHg,
+                skinTempC = skinTempC,
+                humidityPercent = humidityPercent,
+                respiratoryRate = respiratoryRate,
+                posture = posture,
+                fatigue = overexertion.status,
+                dehydration = dehydration.risk,
+                fallRisk = fall.riskStatus,
+                caregiverAlert = CaregiverAlertStatus.Normal,
+                sosActive = sosActive,
+                inactivityMinutes = InactivityMonitor.toMinutes(inactivitySeconds),
+                supercapPercent = (72 + (sin(tick / 8.0) * 8).toInt()).coerceIn(0, 100),
+                ecgSamples = ecgSamples,
+                ecgAnomaly = ecg.status,
+                vitalsRisk = vitalsRisk.risk,
+                rrIntervalsMs = heartRateFromEcg.rrIntervalsMs,
+                imuMagnitude = imuMagnitude,
+                sweatRatePercentPerMin = sweatRatePercentPerMin,
+                hrReservePercent = overexertion.hrReservePercent,
+                bpEstimated = bp.isEstimated,
             )
-
+            val caregiverAlerted = frame.copy(caregiverAlert = CaregiverAlertPolicy.evaluate(frame))
+            emit(caregiverAlerted)
             delay(900)
+        }
+    }
+
+    private fun buildEcgWindow(tick: Int, heartRateBpm: Int): List<Float> {
+        val beatPeriod = (60.0 / heartRateBpm.coerceAtLeast(30)) * ECG_SAMPLE_RATE
+        return List(ECG_SAMPLE_COUNT) { index ->
+            val phase = (index + tick * 4) % beatPeriod.toInt()
+            val qrs = if (phase in 3..8) 0.85f else 0f
+            (0.10 * sin(2.0 * PI * index / ECG_SAMPLE_COUNT * 5.0) +
+                qrs +
+                Random.nextDouble(-0.03, 0.03)).toFloat()
         }
     }
 
     private companion object {
         const val ECG_SAMPLE_COUNT = 256
-        const val ECG_BEAT_PERIOD_SAMPLES = 205
+        const val ECG_SAMPLE_RATE = 256
     }
 }

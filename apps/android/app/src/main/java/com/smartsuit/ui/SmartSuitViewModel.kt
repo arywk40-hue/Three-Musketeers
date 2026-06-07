@@ -9,23 +9,40 @@ import com.smartsuit.ble.SmartSuitBleDataSource
 import com.smartsuit.ble.SmartSuitBleTelemetry
 import com.smartsuit.ble.SmartSuitSimulator
 import com.smartsuit.data.SensorFrame
+import com.smartsuit.data.SensorFrameMerger
+import com.smartsuit.samsung.NoOpSamsungHealthBridge
+import com.smartsuit.samsung.SamsungHealthBridge
+import com.smartsuit.samsung.SamsungHealthState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 class SmartSuitViewModel(application: Application) : AndroidViewModel(application) {
     private val simulator = SmartSuitSimulator()
     private val bleDataSource = SmartSuitBleDataSource(application.applicationContext)
+    private val samsungBridge: SamsungHealthBridge = NoOpSamsungHealthBridge()
 
-    val frames: StateFlow<SensorFrame?> = simulator.frames.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
-        initialValue = null,
-    )
+    val frames: StateFlow<SensorFrame?> = simulator.frames
+        .combine(bleDataSource.telemetry) { simFrame, bleTelemetry ->
+            if (bleDataSource.connectionState.value == BleConnectionState.Connected && bleTelemetry.heartRateBpm != null) {
+                SensorFrameMerger.merge(simFrame, bleTelemetry)
+            } else {
+                simFrame
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+            initialValue = null,
+        )
 
     val bleConnectionState: StateFlow<BleConnectionState> = bleDataSource.connectionState
     val discoveredDevices: StateFlow<List<DiscoveredBleDevice>> = bleDataSource.discoveredDevices
     val bleTelemetry: StateFlow<SmartSuitBleTelemetry> = bleDataSource.telemetry
+    val samsungState: StateFlow<SamsungHealthState> = samsungBridge.state
 
     fun startBleScan() {
         bleDataSource.startScan()
@@ -38,6 +55,13 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     fun connectToFirstDiscoveredDevice() {
         val firstDevice = discoveredDevices.value.firstOrNull() ?: return
         bleDataSource.connect(firstDevice.address)
+    }
+
+    fun startSamsungBridge() {
+        viewModelScope.launch(Dispatchers.IO) {
+            samsungBridge.connect()
+            samsungBridge.requestPermissions()
+        }
     }
 
     override fun onCleared() {

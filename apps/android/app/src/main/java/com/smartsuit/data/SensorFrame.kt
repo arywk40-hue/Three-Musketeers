@@ -18,6 +18,13 @@ data class SensorFrame(
     val inactivityMinutes: Int,
     val supercapPercent: Int,
     val ecgSamples: List<Float>,
+    val ecgAnomaly: EcgAnomalyStatus = EcgAnomalyStatus.Unknown,
+    val vitalsRisk: RiskStatus = RiskStatus.Low,
+    val rrIntervalsMs: List<Int> = emptyList(),
+    val imuMagnitude: Float = 9.81f,
+    val sweatRatePercentPerMin: Float = 0f,
+    val hrReservePercent: Int = 0,
+    val bpEstimated: Boolean = true,
 )
 
 enum class PostureStatus {
@@ -42,4 +49,12 @@ enum class CaregiverAlertStatus {
     Normal,
     Check,
     Urgent,
+}
+
+enum class EcgAnomalyStatus {
+    Unknown,
+    Normal,
+    AFib,
+    Tachycardia,
+    Bradycardia,
 }

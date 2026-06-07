@@ -202,12 +202,12 @@ class SmartSuitBleDataSource(
             gatt.findCharacteristic(SmartSuitBleContract.BATTERY_SERVICE, SmartSuitBleContract.BATTERY_LEVEL),
             gatt.findCharacteristic(SmartSuitBleContract.HEART_RATE_SERVICE, SmartSuitBleContract.HEART_RATE_MEASUREMENT),
             gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.ECG_RAW),
-            gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.IMU_ELBOW_LEFT),
-            gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.IMU_ELBOW_RIGHT),
-            gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.IMU_LUMBAR),
+            gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.IMU_WRIST),
+            gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.SOS_STATE),
+            gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.FALL_RISK),
             gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.HUMIDITY),
             gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.RESP_RATE),
-            gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.POWER_MW),
+            gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.DEVICE_STATE),
         ).filter { characteristic ->
             (characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0
         }
@@ -250,14 +250,14 @@ class SmartSuitBleDataSource(
             SmartSuitBleContract.ECG_RAW -> {
                 _telemetry.value.copy(ecgSamples = SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 256))
             }
-            SmartSuitBleContract.IMU_ELBOW_LEFT -> {
-                _telemetry.value.copy(leftElbowImu = SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 6))
+            SmartSuitBleContract.IMU_WRIST -> {
+                _telemetry.value.copy(wristImu = SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 6))
             }
-            SmartSuitBleContract.IMU_ELBOW_RIGHT -> {
-                _telemetry.value.copy(rightElbowImu = SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 6))
+            SmartSuitBleContract.SOS_STATE -> {
+                _telemetry.value.copy(sosState = (SmartSuitBleParser.parseUint8(payload) ?: 0) != 0)
             }
-            SmartSuitBleContract.IMU_LUMBAR -> {
-                _telemetry.value.copy(lumbarImu = SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 6))
+            SmartSuitBleContract.FALL_RISK -> {
+                _telemetry.value.copy(fallRisk = SmartSuitBleParser.parseFloat32(payload))
             }
             SmartSuitBleContract.HUMIDITY -> {
                 val values = SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 2)
@@ -269,8 +269,8 @@ class SmartSuitBleDataSource(
             SmartSuitBleContract.RESP_RATE -> {
                 _telemetry.value.copy(respiratoryRate = SmartSuitBleParser.parseFloat32(payload))
             }
-            SmartSuitBleContract.POWER_MW -> {
-                _telemetry.value.copy(powerMw = SmartSuitBleParser.parseFloat32(payload))
+            SmartSuitBleContract.DEVICE_STATE -> {
+                _telemetry.value.copy(deviceState = SmartSuitBleParser.parseUint8(payload))
             }
             else -> _telemetry.value
         }

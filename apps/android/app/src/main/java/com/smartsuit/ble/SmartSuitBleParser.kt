@@ -21,6 +21,8 @@ object SmartSuitBleParser {
         return payload.firstOrNull()?.toInt()?.and(0xFF)?.coerceIn(0, 100)
     }
 
+    fun parseUint8(payload: ByteArray): Int? = payload.firstOrNull()?.toInt()?.and(0xFF)
+
     fun parseFloat32(payload: ByteArray): Float? {
         if (payload.size < 4) return null
         return ByteBuffer.wrap(payload)
