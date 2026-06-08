@@ -1,6 +1,7 @@
 package com.smartsuit.ble
 
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGatt.GATT_SUCCESS
@@ -12,7 +13,10 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import com.smartsuit.data.SensorFrame
 import com.smartsuit.data.SmartSuitDataSource
@@ -33,6 +37,8 @@ class SmartSuitBleDataSource(
     private var notificationQueue: List<BluetoothGattCharacteristic> = emptyList()
     private var notificationIndex = 0
     private val devicesByAddress = mutableMapOf<String, android.bluetooth.BluetoothDevice>()
+    private var bondReceiverRegistered = false
+    private var pendingBond = false
 
     private val _connectionState = MutableStateFlow(BleConnectionState.Idle)
     val connectionState: StateFlow<BleConnectionState> = _connectionState
@@ -102,6 +108,8 @@ class SmartSuitBleDataSource(
         try {
             val device = devicesByAddress[address] ?: return
             stopScanOnly()
+            registerBondReceiver()
+            pendingBond = false
             _connectionState.value = BleConnectionState.Connecting
             gatt = device.connectGatt(appContext, false, gattCallback)
         } catch (_: SecurityException) {
@@ -113,6 +121,8 @@ class SmartSuitBleDataSource(
     fun stop() {
         try {
             stopScanOnly()
+            unregisterBondReceiver()
+            pendingBond = false
             gatt?.close()
             gatt = null
             _connectionState.value = BleConnectionState.Idle
@@ -128,23 +138,71 @@ class SmartSuitBleDataSource(
         scanCallback = null
     }
 
+    private val bondReceiver = object : BroadcastReceiver() {
+        @SuppressLint("MissingPermission")
+        override fun onReceive(context: Context, intent: Intent) {
+            val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE) ?: return
+            val bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE)
+            when (bondState) {
+                BluetoothDevice.BOND_BONDING -> {
+                    _connectionState.value = BleConnectionState.Bonding
+                }
+                BluetoothDevice.BOND_BONDED -> {
+                    pendingBond = false
+                    _connectionState.value = BleConnectionState.Bonded
+                    reconnectGatt(device)
+                }
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun reconnectGatt(device: BluetoothDevice) {
+        gatt?.close()
+        gatt = device.connectGatt(appContext, false, gattCallback)
+    }
+
+    private fun registerBondReceiver() {
+        if (bondReceiverRegistered) return
+        val filter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+        appContext.registerReceiver(bondReceiver, filter)
+        bondReceiverRegistered = true
+    }
+
+    private fun unregisterBondReceiver() {
+        if (!bondReceiverRegistered) return
+        try { appContext.unregisterReceiver(bondReceiver) } catch (_: IllegalArgumentException) { }
+        bondReceiverRegistered = false
+    }
+
     private val gattCallback = object : BluetoothGattCallback() {
         @SuppressLint("MissingPermission")
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             if (status != GATT_SUCCESS) {
-                _connectionState.value = BleConnectionState.Error
-                gatt.close()
+                if (!pendingBond) {
+                    _connectionState.value = BleConnectionState.Error
+                    gatt.close()
+                }
                 return
             }
 
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     _connectionState.value = BleConnectionState.Connected
-                    gatt.requestMtu(517)
+                    if (gatt.device.bondState == BluetoothDevice.BOND_BONDED) {
+                        _connectionState.value = BleConnectionState.Bonded
+                        gatt.requestMtu(517)
+                    } else {
+                        pendingBond = true
+                        _connectionState.value = BleConnectionState.Bonding
+                        gatt.device.createBond()
+                    }
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
-                    _connectionState.value = BleConnectionState.Disconnected
-                    gatt.close()
+                    if (!pendingBond) {
+                        _connectionState.value = BleConnectionState.Disconnected
+                        gatt.close()
+                    }
                 }
             }
         }
@@ -252,7 +310,9 @@ class SmartSuitBleDataSource(
                 _telemetry.value.copy(spo2Percent = SmartSuitBleParser.parsePlxContinuousMeasurement(payload))
             }
             SmartSuitBleContract.ECG_RAW -> {
-                _telemetry.value.copy(ecgSamples = SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 256))
+                _telemetry.value.copy(ecgSamples = SensorFrameValidation.ecgSamples(
+                    SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 256),
+                ))
             }
             SmartSuitBleContract.IMU_WRIST -> {
                 _telemetry.value.copy(wristImu = SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 6))
@@ -261,20 +321,26 @@ class SmartSuitBleDataSource(
                 _telemetry.value.copy(sosState = (SmartSuitBleParser.parseUint8(payload) ?: 0) != 0)
             }
             SmartSuitBleContract.FALL_RISK -> {
-                _telemetry.value.copy(fallRisk = SmartSuitBleParser.parseFloat32(payload))
+                _telemetry.value.copy(fallRisk = SensorFrameValidation.fallRisk(
+                    SmartSuitBleParser.parseFloat32(payload),
+                ))
             }
             SmartSuitBleContract.HUMIDITY -> {
-                val values = SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 2)
+                val raw = SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 2)
                 _telemetry.value.copy(
-                    humidityPercent = values.getOrNull(0),
-                    humidityTempC = values.getOrNull(1),
+                    humidityPercent = SensorFrameValidation.humidityPercent(raw.getOrNull(0)),
+                    humidityTempC = SensorFrameValidation.temperatureC(raw.getOrNull(1)),
                 )
             }
             SmartSuitBleContract.RESP_RATE -> {
-                _telemetry.value.copy(respiratoryRate = SmartSuitBleParser.parseFloat32(payload))
+                _telemetry.value.copy(respiratoryRate = SensorFrameValidation.respiratoryRate(
+                    SmartSuitBleParser.parseFloat32(payload),
+                ))
             }
             SmartSuitBleContract.DEVICE_STATE -> {
-                _telemetry.value.copy(deviceState = SmartSuitBleParser.parseUint8(payload))
+                _telemetry.value.copy(deviceState = SensorFrameValidation.deviceState(
+                    SmartSuitBleParser.parseUint8(payload),
+                ))
             }
             else -> _telemetry.value
         }

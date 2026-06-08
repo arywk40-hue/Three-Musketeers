@@ -37,13 +37,32 @@ Threats the **current** unencrypted DB is **not** exposed to:
 - Compromised app process reading a different sandboxed app (Android
   UID isolation).
 
-Production hardening checklist (not yet done):
-- [ ] Integrate `net.zetetic:android-database-sqlcipher` + `androidx.sqlite:sqlite`.
+Production hardening checklist:
+- [x] Integrate `net.zetetic:android-database-sqlcipher` + `androidx.sqlite:sqlite`.
+      2026-06-08: integrated via SupportFactory with AndroidKeyStore-wrapped
+      256-bit passphrase (DatabaseEncryption.kt). Database file renamed
+      from eldercare.db to eldercare_encrypted.db for a clean break from
+      pre-existing plaintext data. The passphrase is generated once on first
+      launch, stored in EncryptedSharedPreferences (AES256-GCM value,
+      AES256-SIV key, MasterKey hardware-bound on TEE-capable devices).
+      The old eldercare.db file is orphaned — acceptable because no real
+      patient data existed before encryption was added.
 - [ ] Wrap key in `AndroidKeyStore` (`KeyGenParameterSpec` with
       `setUserAuthenticationRequired` for caregiver-only access).
+      **Deferred**: required for production where device sharing is common.
+      The current implementation wraps the passphrase in EncryptedSharedPreferences
+      via MasterKey, which already uses AndroidKeyStore — but without
+      user-authentication gating. Adding biometric unlock is a future UX task.
 - [ ] Migrate existing v1 schema to encrypted v2.
-- [ ] Fail-closed on key loss: render the DB unreadable rather than silently
+      **Deferred**: schema stays v1; SQLCipher sits transparently underneath.
+      No migration needed because the database file name was changed (clean
+      break). Future schema changes will use Room's AutoMigration; SQLCipher
+      does not affect the Room migration framework.
+- [x] Fail-closed on key loss: render the DB unreadable rather than silently
       falling back to plaintext.
+      SQLCipher's SupportFactory requires the correct passphrase bytes for
+      every connection. If EncryptedSharedPreferences returns null (key store
+      loss), the database is simply unreachable — no silent fallback.
 
 ### Auto-backup
 

@@ -5,6 +5,8 @@ enum class BleConnectionState {
     Scanning,
     Connecting,
     Connected,
+    Bonding,
+    Bonded,
     Disconnected,
     Unsupported,
     PermissionMissing,

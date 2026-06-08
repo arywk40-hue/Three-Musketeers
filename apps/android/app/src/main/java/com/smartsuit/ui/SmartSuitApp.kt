@@ -1043,6 +1043,7 @@ private fun SamsungHealthPanel(
 ) {
     val stateLabel = when (samsungState) {
         SamsungHealthState.Ready -> "Ready to write"
+        SamsungHealthState.NeedsPartnerApproval -> "Partner approval required"
         SamsungHealthState.NeedsSdkAar -> "AAR missing"
         SamsungHealthState.NeedsPermission -> "Permission needed"
         SamsungHealthState.Disabled -> "Disabled"
@@ -1051,6 +1052,7 @@ private fun SamsungHealthPanel(
     val stateColor = when (samsungState) {
         SamsungHealthState.Ready -> Color(0xFF0F766E)
         SamsungHealthState.NeedsPermission, SamsungHealthState.Disabled -> Color(0xFFB45309)
+        SamsungHealthState.NeedsPartnerApproval -> Color(0xFFB45309)
         else -> Color(0xFFB91C1C)
     }
     Card(
@@ -1102,6 +1104,12 @@ private fun SamsungHealthPanel(
                 ) {
                     Text("Request permission")
                 }
+            } else if (samsungState == SamsungHealthState.NeedsPartnerApproval) {
+                Text(
+                    text = "Register at developer.samsung.com/health/data to obtain partner approval, then download the AAR.",
+                    color = Color(0xFFB45309),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             } else if (samsungState == SamsungHealthState.NeedsSdkAar) {
                 Text(
                     text = "Add health-data-api-1.1.0.aar to apps/android/app/libs/ to enable this section.",

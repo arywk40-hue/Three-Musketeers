@@ -10,15 +10,17 @@ object SmartSuitBleParser {
         if (payload.size < 2) return null
 
         val flags = payload[0].toInt()
-        return if ((flags and HEART_RATE_FORMAT_UINT16_FLAG) != 0) {
+        val raw = if ((flags and HEART_RATE_FORMAT_UINT16_FLAG) != 0) {
             if (payload.size < 3) null else unsignedShortLe(payload, offset = 1)
         } else {
             payload[1].toInt() and 0xFF
         }
+        return SensorFrameValidation.heartRate(raw)
     }
 
     fun parseBatteryLevel(payload: ByteArray): Int? {
-        return payload.firstOrNull()?.toInt()?.and(0xFF)?.coerceIn(0, 100)
+        val raw = payload.firstOrNull()?.toInt()?.and(0xFF)
+        return SensorFrameValidation.batteryPercent(raw)
     }
 
     fun parseUint8(payload: ByteArray): Int? = payload.firstOrNull()?.toInt()?.and(0xFF)
@@ -35,7 +37,8 @@ object SmartSuitBleParser {
 
         val buffer = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
         val values = MutableList(payload.size / 4) { buffer.getFloat() }
-        return if (expectedCount == null || values.size == expectedCount) values else emptyList()
+        if (expectedCount != null && values.size != expectedCount) return emptyList()
+        return SensorFrameValidation.imuSamples(values)
     }
 
     /** Simplified PLX Continuous Measurement parser. Firmware encoding:
@@ -46,7 +49,7 @@ object SmartSuitBleParser {
         val high = payload[2].toInt() and 0xFF
         val spo2 = low or (high shl 8)
         if (spo2 == 0 || spo2 > 100) return null
-        return spo2.toFloat()
+        return SensorFrameValidation.spo2(spo2.toFloat())
     }
 
     private fun unsignedShortLe(payload: ByteArray, offset: Int): Int {

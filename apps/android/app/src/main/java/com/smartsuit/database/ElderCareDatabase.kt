@@ -17,8 +17,10 @@ abstract class ElderCareDatabase : RoomDatabase() {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     ElderCareDatabase::class.java,
-                    "eldercare.db",
-                ).build().also { INSTANCE = it }
+                    "eldercare_encrypted.db",
+                )
+                    .openHelperFactory(DatabaseEncryption.supportFactory(context))
+                    .build().also { INSTANCE = it }
             }
         }
     }

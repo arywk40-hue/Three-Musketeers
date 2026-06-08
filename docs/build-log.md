@@ -1,5 +1,64 @@
 # Build Log
 
+## 2026-06-11
+
+Blocker #3 — BLE pairing security (bonding + MITM).
+- firmware/esp32-c3: added `NimBLESecurityCallbacks` with passkey entry (123456),
+  `setSecurityAuth(true, true, true)`, `setSecurityIOCap(KEYBOARD_ONLY)`, and
+  `setSecurityCallbacks()`. Authentication result logged to Serial.
+- Android SmartSuitBleDataSource: added `BondStateReceiver` for
+  `ACTION_BOND_STATE_CHANGED`, `registerBondReceiver()`/`unregisterBondReceiver()`
+  lifecycle, `reconnectGatt()` post-bond, `pendingBond` flag to prevent
+  premature disconnection during pairing. `BleConnectionState` gains `Bonding`
+  and `Bonded`. On `STATE_CONNECTED`: if bonded → MTU; if not → `createBond()`.
+
+Blocker #4 — Sensor input validation.
+- Created `SensorFrameValidation.kt` with bounds constants and coerce wrappers
+  for HR (30–240), SpO2 (50–100), respiratory rate (5–60), humidity (0–100),
+  temperature (30–45 °C), ECG (−5/+5 mV), accelerometer (±40 m/s²), gyro
+  (±500 °/s), fall risk (0–1), device state (0–2), battery percent (0–100).
+- SmartSuitBleParser: `parseHeartRateMeasurement`, `parseBatteryLevel`,
+  `parsePlxContinuousMeasurement`, `parseFloat32Array` (IMU bounds) now call
+  validation wrappers.
+- SmartSuitBleDataSource.handleNotification: ECG samples, fall risk, humidity,
+  temperature, respiratory rate, and device state are validated before updating
+  telemetry.
+
+Blocker #5 — LiPo battery calibration.
+- firmware/esp32-c3 `vbatToPercent()`: replaced single-segment linear map
+  with 16-entry piecewise lookup table (4.20 V → 100 % down to 3.20 V → 1 %)
+  approximating a real LiPo discharge curve.
+
+Blocker #2 — Samsung Partner Program UX.
+- SamsungHealthState gains `NeedsPartnerApproval` (initial state).
+- SamsungHealthPanel shows partner approval step with link to
+  developer.samsung.com/health/data.
+
+---
+
+## 2026-06-10
+
+Room encryption with SQLCipher + AndroidKeyStore.
+
+Completed:
+- SQLCipher (net.zetetic:android-database-sqlcipher:4.5.6) + security-crypto
+  (1.1.0-alpha06) + sqlite-ktx dependencies added to build.gradle.kts.
+- DatabaseEncryption.kt — SupportFactory singleton with AndroidKeyStore-wrapped
+  256-bit passphrase, stored in EncryptedSharedPreferences. Passphrase generated
+  via SecureRandom on first launch, never exposed in a field or log.
+- ElderCareDatabase.kt — database renamed from eldercare.db to
+  eldercare_encrypted.db (clean break from pre-existing plaintext data).
+  openHelperFactory(DatabaseEncryption.supportFactory(...)) wires SQLCipher into
+  Room's connection pool.
+- data_extraction_rules.xml + backup_rules.xml — eldercare_encrypted.db* family
+  added to the exclude list alongside the old eldercare.db* entries.
+- DatabaseEncryptionTest.kt — 2 tests (factory non-null, cached singleton).
+- security-model.md — SQLCipher checklist item marked as completed with
+  implementation notes. Deferred items (user-auth-gated key, schema migration)
+  annotated.
+
+---
+
 ## 2026-06-08
 
 Architecture alignment pass.

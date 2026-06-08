@@ -25,7 +25,11 @@ interface SamsungHealthBridge {
 }
 
 enum class SamsungHealthState {
-    /** SDK not loaded — drop health-data-api-*.aar into app/libs/ and rebuild. */
+    /** App not registered in the Samsung Health Partner Program. The app ID
+     *  must be approved at developer.samsung.com/health before the SDK works. */
+    NeedsPartnerApproval,
+
+    /** SDK AAR not loaded — drop health-data-api-*.aar into app/libs/ and rebuild. */
     NeedsSdkAar,
 
     /** Waiting on user to grant data permissions inside Samsung Health. */
@@ -42,7 +46,7 @@ enum class SamsungHealthState {
 }
 
 class NoOpSamsungHealthBridge : SamsungHealthBridge {
-    private val _state = MutableStateFlow(SamsungHealthState.NeedsSdkAar)
+    private val _state = MutableStateFlow(SamsungHealthState.NeedsPartnerApproval)
     override val state: StateFlow<SamsungHealthState> = _state
 
     @Volatile
