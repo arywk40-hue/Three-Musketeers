@@ -25,6 +25,7 @@ import com.smartsuit.samsung.SamsungHealthState
 import com.smartsuit.settings.CaregiverPreferences
 import com.smartsuit.settings.isValidPhone
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -126,6 +127,19 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
                         db.alertEventDao().insert(event.toEntity())
                         db.alertEventDao().deleteOlderThan(System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000L)
                     }
+                }
+            }
+        }
+
+        // Samsung Health write cadence — fires every 5 s when bridge is connected.
+        // NoOp until the real AAR is installed (isAvailable returns false); zero
+        // performance cost when dormant.
+        viewModelScope.launch {
+            while (true) {
+                delay(5_000L)
+                val frame = frames.value ?: continue
+                if (samsungBridge.isAvailable()) {
+                    samsungBridge.writeVitals(frame)
                 }
             }
         }

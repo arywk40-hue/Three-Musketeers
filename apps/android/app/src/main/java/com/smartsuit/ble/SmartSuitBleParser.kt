@@ -38,6 +38,17 @@ object SmartSuitBleParser {
         return if (expectedCount == null || values.size == expectedCount) values else emptyList()
     }
 
+    /** Simplified PLX Continuous Measurement parser. Firmware encoding:
+     *  [0]=flags(0x00), [1-2]=SpO2 uint16 LE, [3]=0x00 padding. */
+    fun parsePlxContinuousMeasurement(payload: ByteArray): Float? {
+        if (payload.size < 3) return null
+        val low = payload[1].toInt() and 0xFF
+        val high = payload[2].toInt() and 0xFF
+        val spo2 = low or (high shl 8)
+        if (spo2 == 0 || spo2 > 100) return null
+        return spo2.toFloat()
+    }
+
     private fun unsignedShortLe(payload: ByteArray, offset: Int): Int {
         val low = payload[offset].toInt() and 0xFF
         val high = payload[offset + 1].toInt() and 0xFF

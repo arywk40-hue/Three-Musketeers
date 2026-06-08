@@ -201,6 +201,7 @@ class SmartSuitBleDataSource(
         return listOfNotNull(
             gatt.findCharacteristic(SmartSuitBleContract.BATTERY_SERVICE, SmartSuitBleContract.BATTERY_LEVEL),
             gatt.findCharacteristic(SmartSuitBleContract.HEART_RATE_SERVICE, SmartSuitBleContract.HEART_RATE_MEASUREMENT),
+            gatt.findCharacteristic(SmartSuitBleContract.PLX_SERVICE, SmartSuitBleContract.PLX_CONTINUOUS_MEASUREMENT),
             gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.ECG_RAW),
             gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.IMU_WRIST),
             gatt.findCharacteristic(SmartSuitBleContract.CUSTOM_SERVICE, SmartSuitBleContract.SOS_STATE),
@@ -246,6 +247,9 @@ class SmartSuitBleDataSource(
             }
             SmartSuitBleContract.HEART_RATE_MEASUREMENT -> {
                 _telemetry.value.copy(heartRateBpm = SmartSuitBleParser.parseHeartRateMeasurement(payload))
+            }
+            SmartSuitBleContract.PLX_CONTINUOUS_MEASUREMENT -> {
+                _telemetry.value.copy(spo2Percent = SmartSuitBleParser.parsePlxContinuousMeasurement(payload))
             }
             SmartSuitBleContract.ECG_RAW -> {
                 _telemetry.value.copy(ecgSamples = SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 256))

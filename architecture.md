@@ -162,12 +162,12 @@ Custom vendor service (UUID: `12345678-1234-5678-1234-567812345678`):
 
 ```
   ECG_RAW         notify  float32[256]   raw ECG window, 256 Hz
-  IMU_ELBOW_L     notify  float32[6]     [ax, ay, az, gx, gy, gz]
-  IMU_ELBOW_R     notify  float32[6]
-  IMU_LUMBAR      notify  float32[6]
+  IMU_WRIST       notify  float32[6]     [ax, ay, az, gx, gy, gz]
+  SOS_STATE       notify  uint8          0=off 1=active
+  FALL_RISK       notify  float32        0.0–1.0 firmware risk score
   HUMIDITY        notify  float32[2]     [%RH, temp_C]
   RESP_RATE       notify  float32        breaths/min (ECG-derived)
-  POWER_MW        notify  float32        TEG output milliwatts (live demo value)
+  DEVICE_STATE    notify  uint8          0=Normal 1=Check 2=Urgent
 ```
 
 ---
@@ -182,6 +182,7 @@ Android App
 │   ├── scan for "ElderCare_v1"
 │   ├── GATT connect + MTU negotiate (512 bytes for ECG window)
 │   ├── subscribe all characteristic notifications
+│   ├── parse SIG PLX Continuous (0x2A5F) → spo2Percent when MAX30102 Maxim algorithm fires
 │   └── parse binary frames → SensorFrame data class
 │
 ├── SamsungHealthManager
@@ -190,12 +191,17 @@ Android App
 │   ├── read historical data for History screen
 │   └── handle consent permission flow (required by Samsung)
 │
-├── SafetyEngine
-│   ├── ECGAnomalyModel.tflite       (1D-CNN, optional)
-│   ├── FallDetector.tflite          (IMU classifier or rule engine)
-│   ├── InactivityMonitor            (rule engine)
-│   ├── VitalsRiskModel.tflite       (tabular risk classifier, optional)
-│   └── CaregiverAlertPolicy         (local triage rules)
+├── SafetyEngine (all rule-based; TFLite drop-in path reserved for each engine)
+│   ├── EcgAnomalyDetector.kt       R-peak → RR intervals → RMSSD: Normal/AFib/Tachy/Brady
+│   ├── HeartRateExtractor.kt       256 Hz peak detect + adaptive threshold + baseline removal
+│   ├── FallDetectionEngine.kt      IMU magnitude spike/stillness: Low/Medium/High
+│   ├── FallConfirmationBuffer.kt   2-frame spike+stillness confirmation window
+│   ├── InactivityMonitor.kt        |‖a‖ − 9.81| > 0.6 m/s² motion gate; seconds → minutes
+│   ├── DehydrationRiskModel.kt     Sweat rate + skin temp + HR: Low/Medium/High
+│   ├── OverexertionModel.kt        HR-reserve % + SpO2 drop + RR + IMU: Safe/Caution/Stop
+│   ├── BloodPressureEstimator.kt   HR + skin-temp linear model; isEstimated=true
+│   ├── VitalsRiskMonitor.kt        Composite 4-vital score: Low/Medium/High
+│   └── CaregiverAlertPolicy.kt     Triage: SOS/HR/SpO2/fall/ECG/vitals → Normal/Check/Urgent
 │
 └── UI (Jetpack Compose)
     ├── VitalsScreen    — ECG waveform + HR, SpO2, RR cards
@@ -330,26 +336,33 @@ Calibration: user enters one reference BP reading at app setup
 ### On-device inference pipeline
 
 ```
-BLE notification arrives (1.6 s cycle)
+BLE notification arrives (~900 ms → 1.6 s cycle)
         │
         ▼
-SensorFrame parsed in BLEManager
+SensorFrame merged in SensorFrameMerger (BLE wins over simulator on overlap)
         │
-        ├──► ECG window buffer (accumulate 256 samples) ──► ECGAnomalyModel
+        ├──► ECG samples (256 floats)     ──► HeartRateExtractor ──► EcgAnomalyDetector
+        │                                     (RR intervals, RMSSD, anomaly class)
         │
-        ├──► IMU window buffer (accumulate 400 samples) ──► RepCounterModel
-        │                                                ──► FormScorerModel
+        ├──► IMU_WRIST frame (6 floats)   ──► FallDetectionEngine ──► FallConfirmationBuffer
+        │                                 ──► InactivityMonitor
         │
-        ├──► Tabular features computed per minute        ──► DehydrationModel
-        │                                                ──► OverexertionModel
+        ├──► Tabular per-frame            ──► DehydrationRiskModel
+        │    (sweat rate, skinTemp, HR)   ──► OverexertionModel
+        │                                 ──► VitalsRiskMonitor
         │
-        └──► PPG features per beat                      ──► BPEstimationModel
+        ├──► HR + skinTemp                ──► BloodPressureEstimator
+        │
+        └──► All above outputs            ──► CaregiverAlertPolicy (triage → Normal/Check/Urgent)
                 │
                 ▼
-        UI state update (StateFlow → Compose recompose)
+        AlertHistoryTracker.onFrame() → AlertEvent on level transition → Room + notification
                 │
                 ▼
-        Samsung Health write (HR, SpO2, BP, Temp every 5 s)
+        StateFlow<SensorFrame> → Compose recompose (Vitals / Safety / Caregiver / Readiness tabs)
+                │
+                ▼
+        SamsungHealthBridge.writeVitals() every 5 s (HR, SpO2, BP, Temp)
 ```
 
 ---

@@ -1,5 +1,24 @@
 # Build Log
 
+## 2026-06-08
+
+Architecture alignment pass.
+
+Completed:
+- architecture.md Layer 3 GATT profile corrected to elder-care contract (IMU_WRIST, SOS_STATE, FALL_RISK, DEVICE_STATE — old IMU_ELBOW_L/R, IMU_LUMBAR, POWER_MW removed).
+- architecture.md Layer 4 SafetyEngine module map updated to reflect all 9 rule-based engines.
+- architecture.md Layer 5 on-device inference pipeline updated (RepCounterModel, FormScorerModel removed; full elder-care engine pipeline shown).
+- architecture.md Layer 4 PLX BLE pipe documented.
+- SmartSuitBleTelemetry gains spo2Percent field.
+- SmartSuitBleParser gains parsePlxContinuousMeasurement() for firmware's simplified PLX encoding.
+- SmartSuitBleDataSource subscribes to PLX_CONTINUOUS_MEASUREMENT and parses SpO2 into telemetry.
+- SensorFrameMerger uses BLE SpO2 when available, flows through VitalsRiskMonitor and OverexertionModel.
+- SmartSuitViewModel init block adds Samsung Health 5-second write cadence wired to samsungBridge.writeVitals().
+- Unit tests added: DehydrationRiskModelTest, VitalsRiskMonitorTest, BloodPressureEstimatorTest, InactivityMonitorTest.
+- hardware/README.md clarifies that hardware/embedded/ uses Bluetooth Classic Serial (legacy) and firmware/esp32-c3/ uses NimBLE BLE GATT (current).
+
+---
+
 ## 2026-06-06
 
 Started the product build from the planning repository.

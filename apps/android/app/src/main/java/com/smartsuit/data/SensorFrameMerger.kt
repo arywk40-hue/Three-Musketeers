@@ -20,6 +20,7 @@ object SensorFrameMerger {
         if (!hasBle) return base
 
         val heartRateBpm = ble.heartRateBpm ?: base.heartRateBpm
+        val spo2Percent = ble.spo2Percent ?: base.spo2Percent
         val humidityPercent = ble.humidityPercent ?: base.humidityPercent
         val respiratoryRate = ble.respiratoryRate?.toInt() ?: base.respiratoryRate
         val ecgSamples = ble.ecgSamples.takeIf { it.size == 256 } ?: base.ecgSamples
@@ -47,7 +48,7 @@ object SensorFrameMerger {
         } else {
             null
         }
-        val vitalsRisk = VitalsRiskMonitor.assess(heartRateBpm, base.spo2Percent, respiratoryRate, base.skinTempC)
+        val vitalsRisk = VitalsRiskMonitor.assess(heartRateBpm, spo2Percent, respiratoryRate, base.skinTempC)
         val dehydration = DehydrationRiskModel.assess(
             sweatRatePercentPerMin = base.sweatRatePercentPerMin,
             skinTempC = base.skinTempC,
@@ -55,7 +56,7 @@ object SensorFrameMerger {
         )
         val overexertion = OverexertionModel.assess(
             heartRateBpm = heartRateBpm,
-            spo2Percent = base.spo2Percent,
+            spo2Percent = spo2Percent,
             respiratoryRate = respiratoryRate,
             imuMagnitude = imuMagnitude,
         )
@@ -69,6 +70,7 @@ object SensorFrameMerger {
 
         val merged = base.copy(
             heartRateBpm = heartRateBpm,
+            spo2Percent = spo2Percent,
             humidityPercent = humidityPercent,
             respiratoryRate = respiratoryRate,
             ecgSamples = ecgSamples,

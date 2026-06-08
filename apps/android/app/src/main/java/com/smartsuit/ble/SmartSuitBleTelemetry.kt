@@ -10,5 +10,6 @@ data class SmartSuitBleTelemetry(
     val humidityPercent: Float? = null,
     val humidityTempC: Float? = null,
     val respiratoryRate: Float? = null,
+    val spo2Percent: Float? = null,
     val deviceState: Int? = null,
 )

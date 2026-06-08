@@ -1,5 +1,18 @@
 # Hardware
 
+## Firmware paths
+
+This repository contains two distinct firmware implementations:
+
+| Path | Protocol | Status | Purpose |
+|------|----------|--------|---------|
+| `hardware/embedded/` | **Bluetooth Classic Serial** (BluetoothSerial / SPP) | Legacy | Earlier proof-of-concept using Arduino-style serial JSON. NOT compatible with the Android app's BLE GATT client. |
+| `firmware/esp32-c3/main.ino` | **BLE 5.0 GATT** (NimBLE-Arduino) | Current | Production firmware for ElderCare Guardian. Advertises as `ElderCare_v1` and streams all characteristics to the Android app. Use this one. |
+
+The `hardware/embedded/` sketch can still be used to validate sensor wiring over a USB serial monitor, but do not flash it for Android integration testing.
+
+---
+
 Hardware work is split into bench validation and a simple elder-care wearable prototype.
 
 ## Bench Validation
