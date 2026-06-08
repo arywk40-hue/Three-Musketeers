@@ -43,18 +43,11 @@ jobs:
           gradle-version: '8.10.2'
           cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
 
-      - name: Generate Gradle wrapper
-        working-directory: apps/android
-        run: gradle wrapper --gradle-version 8.10.2 --distribution-type bin
-
-      - name: Make gradlew executable
-        run: chmod +x apps/android/gradlew
-
       - name: Build debug APK
-        run: ./apps/android/gradlew -p apps/android assembleDebug --no-daemon --stacktrace
+        run: gradle -p apps/android assembleDebug --no-daemon --stacktrace
 
       - name: Run unit tests
-        run: ./apps/android/gradlew -p apps/android testDebugUnitTest --no-daemon --stacktrace
+        run: gradle -p apps/android testDebugUnitTest --no-daemon --stacktrace
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
