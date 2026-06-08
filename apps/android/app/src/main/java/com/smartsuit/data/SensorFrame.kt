@@ -25,6 +25,7 @@ data class SensorFrame(
     val sweatRatePercentPerMin: Float = 0f,
     val hrReservePercent: Int = 0,
     val bpEstimated: Boolean = true,
+    val batteryPercent: Int? = null,
 )
 
 enum class PostureStatus {

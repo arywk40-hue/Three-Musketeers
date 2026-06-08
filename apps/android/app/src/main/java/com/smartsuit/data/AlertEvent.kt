@@ -15,5 +15,6 @@ enum class AlertReason(val displayLabel: String) {
     LowSpO2("SpO₂ dropped"),
     Inactivity("Prolonged inactivity"),
     DeviceAlert("Device alert"),
+    LowBattery("Battery low"),
     Resolved("Alert resolved"),
 }

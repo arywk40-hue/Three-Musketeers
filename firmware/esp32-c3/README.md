@@ -21,6 +21,7 @@ ElderCare Guardian BLE GATT server for the prototype wearable.
 | INT    | MAX30102   | (unused)   | Polling mode for prototype           |
 | AD0    | MPU-6050   | GND        | I²C address 0x68                     |
 | SOS    | Button     | GPIO 9     | Button to GND, `INPUT_PULLUP`        |
+| VBAT   | Battery    | GPIO 4     | ADC1_CH4 via R1=100kΩ + R2=200kΩ divider |
 
 MAX30102 and MPU-6050 share the same I²C bus (SDA = GPIO6, SCL = GPIO7).
 Phase 2 firmware will add the I²C drivers and replace the synthetic block in

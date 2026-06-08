@@ -10,6 +10,7 @@ import com.smartsuit.ml.BloodPressureEstimator
 import com.smartsuit.ml.CaregiverAlertPolicy
 import com.smartsuit.ml.DehydrationRiskModel
 import com.smartsuit.ml.EcgAnomalyDetector
+import com.smartsuit.ml.FallConfirmationBuffer
 import com.smartsuit.ml.FallDetectionEngine
 import com.smartsuit.ml.HeartRateExtractor
 import com.smartsuit.ml.InactivityMonitor
@@ -24,6 +25,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 class SmartSuitSimulator : SmartSuitDataSource {
+    private val fallBuffer = FallConfirmationBuffer()
+
     override val frames: Flow<SensorFrame> = flow {
         var tick = 0
         var inactivitySeconds = 0
@@ -61,6 +64,8 @@ class SmartSuitSimulator : SmartSuitDataSource {
                 listOf(ax, ay, az, gx, gy, gz)
             }
             val fall = FallDetectionEngine.assess(simulatedWristImu)
+            val sosActive = tick % 53 in 49..52
+            val confirmedFallRisk = fallBuffer.assess(fall, sosActive)
             inactivitySeconds = InactivityMonitor.assess(imuMagnitude, inactivitySeconds)
 
             val bp = BloodPressureEstimator.estimate(heartRateBpm, skinTempC)
@@ -78,7 +83,6 @@ class SmartSuitSimulator : SmartSuitDataSource {
                 RiskStatus.Low -> PostureStatus.Good
             }
 
-            val sosActive = tick % 53 in 49..52
             val frame = SensorFrame(
                 timestampMillis = System.currentTimeMillis(),
                 heartRateBpm = heartRateBpm,
@@ -91,7 +95,7 @@ class SmartSuitSimulator : SmartSuitDataSource {
                 posture = posture,
                 fatigue = overexertion.status,
                 dehydration = dehydration.risk,
-                fallRisk = fall.riskStatus,
+                fallRisk = confirmedFallRisk,
                 caregiverAlert = CaregiverAlertStatus.Normal,
                 sosActive = sosActive,
                 inactivityMinutes = InactivityMonitor.toMinutes(inactivitySeconds),
@@ -104,6 +108,7 @@ class SmartSuitSimulator : SmartSuitDataSource {
                 sweatRatePercentPerMin = sweatRatePercentPerMin,
                 hrReservePercent = overexertion.hrReservePercent,
                 bpEstimated = bp.isEstimated,
+                batteryPercent = (90 - tick % 95).coerceIn(0, 100),
             )
             val caregiverAlerted = frame.copy(caregiverAlert = CaregiverAlertPolicy.evaluate(frame))
             emit(caregiverAlerted)

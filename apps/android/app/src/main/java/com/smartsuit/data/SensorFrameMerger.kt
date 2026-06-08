@@ -4,6 +4,7 @@ import com.smartsuit.ble.SmartSuitBleTelemetry
 import com.smartsuit.ml.CaregiverAlertPolicy
 import com.smartsuit.ml.DehydrationRiskModel
 import com.smartsuit.ml.EcgAnomalyDetector
+import com.smartsuit.ml.FallConfirmationBuffer
 import com.smartsuit.ml.FallDetectionEngine
 import com.smartsuit.ml.HeartRateExtractor
 import com.smartsuit.ml.InactivityMonitor
@@ -12,6 +13,8 @@ import com.smartsuit.ml.VitalsRiskMonitor
 import kotlin.math.sqrt
 
 object SensorFrameMerger {
+    private val fallBuffer = FallConfirmationBuffer()
+
     fun merge(base: SensorFrame, ble: SmartSuitBleTelemetry): SensorFrame {
         val hasBle = ble.heartRateBpm != null
         if (!hasBle) return base
@@ -26,6 +29,7 @@ object SensorFrameMerger {
         } else {
             null
         }
+        val confirmedFallRisk = fall?.let { fallBuffer.assess(it, ble.sosState) }
         val imuMagnitude = if (ble.wristImu.size >= 6) {
             val a = ble.wristImu
             sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2])
@@ -69,7 +73,7 @@ object SensorFrameMerger {
             respiratoryRate = respiratoryRate,
             ecgSamples = ecgSamples,
             sosActive = ble.sosState,
-            fallRisk = fall?.riskStatus ?: base.fallRisk,
+            fallRisk = confirmedFallRisk ?: base.fallRisk,
             posture = posture,
             fatigue = overexertion.status,
             dehydration = dehydration.risk,
@@ -78,6 +82,7 @@ object SensorFrameMerger {
             rrIntervalsMs = heartRateFromEcg?.rrIntervalsMs ?: base.rrIntervalsMs,
             imuMagnitude = imuMagnitude,
             hrReservePercent = overexertion.hrReservePercent,
+            batteryPercent = ble.batteryPercent ?: base.batteryPercent,
         )
 
         val alert = CaregiverAlertPolicy.evaluate(merged)

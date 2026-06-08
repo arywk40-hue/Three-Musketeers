@@ -776,7 +776,7 @@ private fun DailyStatusPanel(frame: SensorFrame) {
             SignalRow("Hydration risk", frame.dehydration.name, riskProgress(frame.dehydration))
             SignalRow("Breathing trend", "${frame.respiratoryRate} breaths/min", 0.55f)
             SignalRow("HR reserve", "${frame.hrReservePercent}%", (frame.hrReservePercent / 100f).coerceIn(0f, 1f))
-            SignalRow("Device battery", "${frame.supercapPercent}%", frame.supercapPercent / 100f)
+            BatteryRow(frame.batteryPercent)
         }
     }
 }
@@ -1142,6 +1142,39 @@ private fun SectionTitle(title: String) {
 }
 
 @Composable
+private fun BatteryRow(percent: Int?) {
+    val display = percent?.let { "$it%" } ?: "—"
+    val progress = ((percent ?: 0).coerceIn(0, 100)) / 100f
+    val isLow = percent != null && percent < 15
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Device battery", color = Color(0xFF475569), style = MaterialTheme.typography.bodyMedium)
+            Text(display, color = Color(0xFF0F172A), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        }
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp)),
+            color = if (isLow) Color(0xFFB91C1C) else Color(0xFF0F766E),
+            trackColor = Color(0xFFE2E8F0),
+        )
+        if (isLow) {
+            Text(
+                "Battery low — please charge the device",
+                color = Color(0xFFB91C1C),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
 private fun SignalRow(label: String, value: String, progress: Float) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
@@ -1205,19 +1238,4 @@ private fun fatigueProgress(status: FatigueStatus): Float = when (status) {
     FatigueStatus.Safe -> 0.25f
     FatigueStatus.Caution -> 0.65f
     FatigueStatus.Stop -> 0.95f
-}
-
-        CaregiverAlertStatus.Check -> Color(0xFFB45309)
-        else -> Color(0xFF0F766E)
-    }
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(color.copy(alpha = 0.12f))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, color = color, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-    }
 }

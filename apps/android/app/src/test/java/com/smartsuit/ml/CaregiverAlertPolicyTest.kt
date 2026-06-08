@@ -21,6 +21,7 @@ class CaregiverAlertPolicyTest {
         ecgAnomaly: EcgAnomalyStatus = EcgAnomalyStatus.Normal,
         vitalsRisk: RiskStatus = RiskStatus.Low,
         sosActive: Boolean = false,
+        batteryPercent: Int? = 75,
     ): SensorFrame = SensorFrame(
         timestampMillis = 0L,
         heartRateBpm = heartRateBpm,
@@ -41,6 +42,7 @@ class CaregiverAlertPolicyTest {
         ecgSamples = emptyList(),
         ecgAnomaly = ecgAnomaly,
         vitalsRisk = vitalsRisk,
+        batteryPercent = batteryPercent,
     )
 
     // ── Urgent cases ──
@@ -128,6 +130,22 @@ class CaregiverAlertPolicyTest {
     @Test
     fun `SpO2 90 to 94 returns Check`() {
         assertEquals(CaregiverAlertStatus.Check, CaregiverAlertPolicy.evaluate(baseFrame(spo2Percent = 92f)))
+    }
+
+    @Test
+    fun `battery below 15 percent returns Check`() {
+        assertEquals(CaregiverAlertStatus.Check, CaregiverAlertPolicy.evaluate(baseFrame(batteryPercent = 12)))
+    }
+
+    @Test
+    fun `battery at or above 15 percent does not return Check`() {
+        assertEquals(CaregiverAlertStatus.Normal, CaregiverAlertPolicy.evaluate(baseFrame(batteryPercent = 15)))
+        assertEquals(CaregiverAlertStatus.Normal, CaregiverAlertPolicy.evaluate(baseFrame(batteryPercent = 80)))
+    }
+
+    @Test
+    fun `battery null does not return Check`() {
+        assertEquals(CaregiverAlertStatus.Normal, CaregiverAlertPolicy.evaluate(baseFrame(batteryPercent = null)))
     }
 
     // ── Normal ──

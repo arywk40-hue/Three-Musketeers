@@ -41,6 +41,7 @@ object CaregiverAlertPolicy {
         if (frame.inactivityMinutes > 20) return true
         if (frame.heartRateBpm > 110 || frame.heartRateBpm < 50) return true
         if (frame.spo2Percent in 90f..94f) return true
+        if (frame.batteryPercent != null && frame.batteryPercent < 15) return true
         return false
     }
 }

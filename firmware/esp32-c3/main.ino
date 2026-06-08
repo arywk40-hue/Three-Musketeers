@@ -31,6 +31,8 @@
 static const uint8_t SOS_BTN_PIN = 9;   // active low, INPUT_PULLUP
 static const uint8_t I2C_SDA_PIN = 6;
 static const uint8_t I2C_SCL_PIN = 7;
+static const uint8_t BATT_ADC_PIN = 4;  // ADC1_CH4 — LiPo voltage divider tap
+static const uint8_t BATT_ADC_SAMPLES = 8;  // rolling-average window for ADC
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UUIDs — MUST match SmartSuitBleContract.kt exactly
@@ -42,6 +44,8 @@ static const ble_uuid128_t UUID_BATTERY_SVC        = BLE_UUID128_INIT(0x0F, 0x18
 static const ble_uuid128_t UUID_BATTERY_LEVEL      = BLE_UUID128_INIT(0x19, 0x2A);                          // 00002A19-...
 static const ble_uuid128_t UUID_HEART_RATE_SVC     = BLE_UUID128_INIT(0x0D, 0x18);                          // 0000180D-...
 static const ble_uuid128_t UUID_HR_MEASUREMENT     = BLE_UUID128_INIT(0x37, 0x2A);                          // 00002A37-...
+static const ble_uuid128_t UUID_PLX_SVC            = BLE_UUID128_INIT(0x22, 0x18);                          // 00001822-...
+static const ble_uuid128_t UUID_PLX_CHR            = BLE_UUID128_INIT(0x5F, 0x2A);                          // 00002A5F-...
 
 // Custom service 12345678-1234-5678-1234-567812345678
 static const ble_uuid128_t UUID_CUSTOM_SVC = BLE_UUID128_INIT(
@@ -64,10 +68,12 @@ static const ble_uuid128_t UUID_DEVICE_STATE  = BLE_UUID128_INIT(0x7f, 0x56, 0x3
 NimBLEServer*         g_server   = nullptr;
 NimBLEService*        g_battSvc  = nullptr;
 NimBLEService*        g_hrSvc    = nullptr;
+NimBLEService*        g_plxSvc   = nullptr;
 NimBLEService*        g_customSvc= nullptr;
 
 NimBLECharacteristic* g_battChr  = nullptr;
 NimBLECharacteristic* g_hrChr    = nullptr;
+NimBLECharacteristic* g_plxChr   = nullptr;
 NimBLECharacteristic* g_ecgChr   = nullptr;
 NimBLECharacteristic* g_imuChr   = nullptr;
 NimBLECharacteristic* g_sosChr   = nullptr;
@@ -80,6 +86,18 @@ uint8_t g_battValue     = 88;
 uint8_t g_sosValue      = 0;
 uint8_t g_deviceState   = 0;
 uint32_t g_tickCounter  = 0;
+
+// Battery state — see docs/battery-model.md for the LiPo curve and
+// voltage-divider derivation. R1=100kΩ (top, VBAT) + R2=200kΩ (bottom, GND)
+// gives a divider ratio of 0.667, so VBAT in [3.0, 4.2] V maps to ADC
+// input in [2.0, 2.8] V — well within the ESP32-C3 ADC range.
+static const float BATT_DIVIDER_RATIO = 0.667f;  // R2 / (R1 + R2)
+static const float BATT_ADC_VREF      = 3.3f;    // ESP32-C3 ADC reference
+static const int   BATT_ADC_MAX       = 4095;    // 12-bit ADC
+static const float BATT_VBAT_MIN      = 3.0f;    // empty LiPo
+static const float BATT_VBAT_MAX      = 4.2f;    // full LiPo
+static const float BATT_VBAT_NOM      = 3.7f;    // nominal mid-rail
+static const uint8_t BATT_LOW_PCT     = 15;      // threshold for low-battery alert
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sensor state
@@ -105,6 +123,13 @@ static int  g_spo2BufferIdx = 0;
 static int8_t g_spo2Percent = 0;
 static int8_t g_spo2Valid   = 0;
 
+// Cap on the number of MAX30102 FIFO samples drained per loop() call. The
+// sensor runs at 100 Hz, so a full second's worth of data accumulates
+// between loop() iterations; draining 25 samples at 400 kHz I²C takes
+// ~2 ms, which keeps the 1-second loop responsive while still feeding
+// 25 samples/sec to the beat-detection and SpO2 state machines.
+static const int MAX_FIFO_DRAIN = 25;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Float packing helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -116,6 +141,35 @@ void packFloatArray(uint8_t* buf, int offset, const float* values, int count) {
     for (int i = 0; i < count; i++) {
         packFloat(buf, offset + i * 4, values[i]);
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Battery voltage → percent
+// ─────────────────────────────────────────────────────────────────────────────
+// Piecewise-linear LiPo discharge curve. The plateau at 3.7 V is long, so
+// the mid-range is compressed; the knee near 3.5 V drops quickly, so the
+// low-range is expanded. The single linear formula below the table gives
+// a reasonable approximation in [3.0, 4.2] V; replace with a calibrated
+// table once Ariyan measures the actual cell on the bench.
+static uint8_t vbatToPercent(float vbat) {
+    if (vbat >= BATT_VBAT_MAX) return 100;
+    if (vbat <= BATT_VBAT_MIN) return 0;
+    // Single-segment linear map, good enough for prototype display.
+    float pct = (vbat - BATT_VBAT_MIN) / (BATT_VBAT_MAX - BATT_VBAT_MIN) * 100.0f;
+    if (pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
+    return (uint8_t)(pct + 0.5f);
+}
+
+static uint8_t readBatteryPercent() {
+    uint32_t accum = 0;
+    for (int i = 0; i < BATT_ADC_SAMPLES; i++) {
+        accum += (uint32_t)analogRead(BATT_ADC_PIN);
+    }
+    float raw = (float)accum / (float)BATT_ADC_SAMPLES;
+    float vAdc = (raw / (float)BATT_ADC_MAX) * BATT_ADC_VREF;
+    float vBat = vAdc / BATT_DIVIDER_RATIO;
+    return vbatToPercent(vBat);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -199,6 +253,14 @@ void setup() {
     g_hrChr->createDescriptor(BLE_UUID_DESCRIPTOR_CLIENT_CHAR_CONFIG);
     g_hrSvc->start();
 
+    // ── Pulse Oximeter service (SpO2 over BLE) ──
+    // Carries the Maxim-algorithm SpO2 result so a properly-paired Android
+    // client can read it via gatt.getCharacteristic(PLX_CONTINUOUS_MEASUREMENT).
+    g_plxSvc = g_server->createService(UUID_PLX_SVC);
+    g_plxChr = g_plxSvc->createCharacteristic(UUID_PLX_CHR, NIMBLE_PROPERTY::NOTIFY);
+    g_plxChr->createDescriptor(BLE_UUID_DESCRIPTOR_CLIENT_CHAR_CONFIG);
+    g_plxSvc->start();
+
     // ── Custom service ──
     g_customSvc = g_server->createService(UUID_CUSTOM_SVC);
     g_ecgChr   = makeNotifyChar(UUID_ECG_RAW,      "ECG_RAW");
@@ -214,6 +276,7 @@ void setup() {
     NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
     adv->addServiceUUID(UUID_BATTERY_SVC);
     adv->addServiceUUID(UUID_HEART_RATE_SVC);
+    adv->addServiceUUID(UUID_PLX_SVC);
     adv->addServiceUUID(UUID_CUSTOM_SVC);
     adv->setScanResponse(true);
     adv->start();
@@ -234,11 +297,13 @@ void loop() {
     if (g_maxReady) {
         // Default fallback while we accumulate at least 3 valid intervals.
         hrBpmF = 75.0f;
-        // Drain the FIFO without blocking. Each call to check() advances
-        // the library's beat-detection state machine and pushes one
-        // sample into the FIFO. We pull IR and RED for both beat detection
-        // and the SpO2 algorithm.
-        while (g_particleSensor.available()) {
+        // Drain the FIFO in bounded chunks so the 1-second loop stays
+        // responsive. At 100 Hz sample rate, ~100 samples queue per second
+        // of wall time; capping at MAX_FIFO_DRAIN per loop() call gives
+        // the BLE notifies a chance to fire on a regular cadence. Any
+        // samples that remain in the FIFO are picked up on the next call.
+        int drained = 0;
+        while (g_particleSensor.available() && drained < MAX_FIFO_DRAIN) {
             g_particleSensor.check();
             long irValue = g_particleSensor.getIR();
             // Beat detection: checkForBeat returns true on a detected R-wave.
@@ -261,6 +326,7 @@ void loop() {
                 g_irBuffer[g_spo2BufferIdx]  = (uint32_t)irValue;
                 g_spo2BufferIdx++;
             }
+            drained++;
         }
         // Compute mean HR from the last N beat-to-beat intervals.
         if (g_validBeatCount >= 3) {
@@ -272,8 +338,10 @@ void loop() {
             }
         }
         // Run the SpO2 algorithm once the buffer is full. Reset and
-        // restart the buffer. We log to Serial because no PLX
-        // characteristic exists in the current GATT contract.
+        // restart the buffer. The result is broadcast over BLE via the
+        // PLX_CONTINUOUS_MEASUREMENT characteristic below (only when
+        // g_spo2Valid is set), and also logged to Serial for bench
+        // validation.
         if (g_spo2BufferIdx >= SPO2_BUFFER_SIZE) {
             int32_t computedHr = 0, computedSpo2 = 0;
             int8_t hrValid = 0;
@@ -288,7 +356,8 @@ void loop() {
     } else {
         // Synthetic fallback so the BLE pipe stays up and the demo
         // continues to render the dashboard. The phase matches a
-        // patient at rest, ~75 bpm.
+        // patient at rest, ~75 bpm. g_spo2Valid stays 0 in this path
+        // so the PLX characteristic is never notified with a fake value.
         hrBpmF = 75.0f + 6.0f * sinf(t * 0.5f);
     }
     uint8_t hrBpm = (uint8_t)(hrBpmF + 0.5f);
@@ -334,7 +403,33 @@ void loop() {
     g_hrChr->setValue(hrBuf, sizeof(hrBuf));
     g_hrChr->notify();
 
+    // ── PLX notify (SIG PLX Continuous Measurement, simplified 4-byte form) ──
+    // Byte 0: flags = 0x00 (no optional fields, no PR interval).
+    // Bytes 1–2: SpO2 as uint16 little-endian (Maxim-algorithm value).
+    // Byte 3: 0x00 padding so the payload round-trips through NimBLE's
+    //         length-checked setValue() regardless of the SFLOAT exponent
+    //         byte's interpretation by any future consumer.
+    // We only notify when g_spo2Valid is set by the Maxim algorithm —
+    // a 0%/uninitialized reading is never broadcast. Synthetic-fallback
+    // runs never set g_spo2Valid, so the PLX characteristic stays silent
+    // in the no-sensor path.
+    if (g_spo2Valid && g_plxChr != nullptr) {
+        uint16_t spo2 = (uint16_t)g_spo2Percent;
+        uint8_t plxBuf[4] = {
+            0x00,
+            (uint8_t)(spo2 & 0xFF),
+            (uint8_t)((spo2 >> 8) & 0xFF),
+            0x00,
+        };
+        g_plxChr->setValue(plxBuf, sizeof(plxBuf));
+        g_plxChr->notify();
+    }
+
     // ── Battery notify (uint8 percent) ──
+    // Real ADC read each loop so the value tracks actual cell voltage.
+    // 8-sample rolling average smooths ADC noise; 1 Hz update rate is
+    // fine for a caregiver-facing battery indicator.
+    g_battValue = readBatteryPercent();
     g_battChr->setValue(&g_battValue, 1);
     g_battChr->notify();
 
