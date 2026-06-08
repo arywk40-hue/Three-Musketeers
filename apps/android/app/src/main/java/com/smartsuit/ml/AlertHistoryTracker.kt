@@ -41,7 +41,13 @@ class AlertHistoryTracker(private val maxEvents: Int = 50) {
             frame.heartRateBpm > 130 -> AlertReason.HeartRateHigh
             frame.heartRateBpm < 40 -> AlertReason.HeartRateLow
             frame.spo2Percent < 90f -> AlertReason.LowSpO2
-            frame.inactivityMinutes > 20 -> AlertReason.Inactivity
+            frame.fallRisk == RiskStatus.Medium -> AlertReason.FallDetected
+            frame.heartRateBpm > 110 -> AlertReason.HeartRateHigh
+            frame.heartRateBpm < 50 -> AlertReason.HeartRateLow
+            frame.spo2Percent < 94f -> AlertReason.LowSpO2
+            // Night threshold is 5 min; day is 20 min — pick the lower (conservative) in reason
+            frame.inactivityMinutes >= InactivityMonitor.NIGHT_INACTIVITY_THRESHOLD_MINUTES -> AlertReason.Inactivity
+            frame.batteryPercent != null && frame.batteryPercent < 15 -> AlertReason.LowBattery
             current == CaregiverAlertStatus.Normal -> AlertReason.Resolved
             else -> AlertReason.DeviceAlert
         }

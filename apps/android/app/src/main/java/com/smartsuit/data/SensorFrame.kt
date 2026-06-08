@@ -46,10 +46,26 @@ enum class RiskStatus {
     High,
 }
 
+/**
+ * Four-level caregiver alert hierarchy (Phase 7).
+ *
+ *  Level 1 — Normal:    No action required. All vitals within acceptable range.
+ *  Level 2 — Check:     Soft concern. Caregiver should check in within the hour.
+ *                       Examples: mild tachycardia, 10-min inactivity, low battery.
+ *  Level 3 — Warning:   Elevated concern. Caregiver should respond within minutes.
+ *                       Examples: sustained tachycardia, SpO2 90–94%, prolonged inactivity,
+ *                       confirmed medium fall risk.
+ *  Level 4 — Emergency: Immediate response required.
+ *                       Examples: SOS pressed, confirmed fall, SpO2 < 90%, HR > 130 / < 40.
+ *
+ * The old two-level (Normal/Check) and three-level (Normal/Check/Urgent) systems
+ * collapsed Warning into either Check or Urgent, losing actionable granularity.
+ */
 enum class CaregiverAlertStatus {
     Normal,
     Check,
-    Urgent,
+    Warning,
+    Emergency,
 }
 
 enum class EcgAnomalyStatus {

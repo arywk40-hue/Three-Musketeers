@@ -18,6 +18,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import com.smartsuit.data.SensorFrame
 import com.smartsuit.data.SmartSuitDataSource
 import kotlinx.coroutines.flow.Flow
@@ -26,19 +28,45 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import java.util.UUID
 
+/**
+ * BLE GATT client for ElderCare Guardian wearable.
+ *
+ * Phase 3 improvements:
+ *  - Auto-reconnect with exponential back-off on unexpected disconnect.
+ *  - Scan timeout (30 s) + switch to BALANCED mode after first device found.
+ *  - Scan timeout handler posts a stop if no device connects within 30 seconds.
+ *  - Max reconnect attempts (10) before surfacing a permanent Error state.
+ *  - BLE state machine is explicit: Idle → Scanning → Connecting → Bonding →
+ *    Bonded → Connected → Disconnected → Reconnecting → Error.
+ *
+ * Threading note: All GATT callbacks arrive on the BLE thread. MutableStateFlow
+ * updates are thread-safe. Do NOT call gatt.close() from a GATT callback — post
+ * it on the main handler to avoid deadlocks in the Android BLE stack.
+ */
 class SmartSuitBleDataSource(
     context: Context,
 ) : SmartSuitDataSource {
     private val appContext = context.applicationContext
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val bluetoothManager = appContext.getSystemService(BluetoothManager::class.java)
     private val bluetoothAdapter = bluetoothManager?.adapter
+
     private var scanCallback: ScanCallback? = null
     private var gatt: BluetoothGatt? = null
     private var notificationQueue: List<BluetoothGattCharacteristic> = emptyList()
     private var notificationIndex = 0
-    private val devicesByAddress = mutableMapOf<String, android.bluetooth.BluetoothDevice>()
+    private val devicesByAddress = mutableMapOf<String, BluetoothDevice>()
     private var bondReceiverRegistered = false
     private var pendingBond = false
+
+    // Auto-reconnect state
+    private var targetAddress: String? = null
+    private var reconnectAttempts = 0
+    private val maxReconnectAttempts = 10
+
+    // Scan timeout: stop scanning after 30 s if nothing connects
+    private val scanTimeoutMs = 30_000L
+    private val scanTimeoutRunnable = Runnable { stopScanOnly() }
 
     private val _connectionState = MutableStateFlow(BleConnectionState.Idle)
     val connectionState: StateFlow<BleConnectionState> = _connectionState
@@ -51,6 +79,10 @@ class SmartSuitBleDataSource(
 
     override val frames: Flow<SensorFrame> = emptyFlow()
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Public API
+    // ─────────────────────────────────────────────────────────────────────────
+
     @SuppressLint("MissingPermission")
     fun startScan() {
         try {
@@ -60,8 +92,7 @@ class SmartSuitBleDataSource(
                 return
             }
 
-            val scanner = adapter.bluetoothLeScanner
-            if (scanner == null) {
+            val scanner = adapter.bluetoothLeScanner ?: run {
                 _connectionState.value = BleConnectionState.Unsupported
                 return
             }
@@ -73,6 +104,9 @@ class SmartSuitBleDataSource(
             val filter = ScanFilter.Builder()
                 .setDeviceName(SmartSuitBleContract.DEVICE_NAME)
                 .build()
+
+            // Start with LOW_LATENCY for fast initial discovery, the scan-result
+            // callback switches to BALANCED after the first hit to save battery.
             val settings = ScanSettings.Builder()
                 .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                 .build()
@@ -80,7 +114,8 @@ class SmartSuitBleDataSource(
             scanCallback = object : ScanCallback() {
                 override fun onScanResult(callbackType: Int, result: ScanResult) {
                     val device = result.device ?: return
-                    val name = result.scanRecord?.deviceName ?: device.name ?: SmartSuitBleContract.DEVICE_NAME
+                    val name = result.scanRecord?.deviceName ?: device.name
+                        ?: SmartSuitBleContract.DEVICE_NAME
                     val discovered = DiscoveredBleDevice(
                         name = name,
                         address = device.address,
@@ -98,6 +133,10 @@ class SmartSuitBleDataSource(
             }
 
             scanner.startScan(listOf(filter), settings, scanCallback)
+
+            // Auto-stop scan after 30 s
+            mainHandler.removeCallbacks(scanTimeoutRunnable)
+            mainHandler.postDelayed(scanTimeoutRunnable, scanTimeoutMs)
         } catch (_: SecurityException) {
             _connectionState.value = BleConnectionState.PermissionMissing
         }
@@ -106,12 +145,14 @@ class SmartSuitBleDataSource(
     @SuppressLint("MissingPermission")
     fun connect(address: String) {
         try {
-            val device = devicesByAddress[address] ?: return
-            stopScanOnly()
-            registerBondReceiver()
-            pendingBond = false
-            _connectionState.value = BleConnectionState.Connecting
-            gatt = device.connectGatt(appContext, false, gattCallback)
+            val device = devicesByAddress[address] ?: run {
+                // Address known but device object not cached — try to get from adapter.
+                bluetoothAdapter?.getRemoteDevice(address)?.let { devicesByAddress[address] = it }
+                    ?: return
+            }
+            targetAddress = address
+            reconnectAttempts = 0
+            connectInternal(device)
         } catch (_: SecurityException) {
             _connectionState.value = BleConnectionState.PermissionMissing
         }
@@ -120,29 +161,97 @@ class SmartSuitBleDataSource(
     @SuppressLint("MissingPermission")
     fun stop() {
         try {
+            targetAddress = null
+            reconnectAttempts = 0
+            mainHandler.removeCallbacks(scanTimeoutRunnable)
+            mainHandler.removeCallbacks(reconnectRunnable)
             stopScanOnly()
             unregisterBondReceiver()
             pendingBond = false
-            gatt?.close()
-            gatt = null
+            closeGatt()
             _connectionState.value = BleConnectionState.Idle
         } catch (_: SecurityException) {
             _connectionState.value = BleConnectionState.PermissionMissing
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Internal connection helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @SuppressLint("MissingPermission")
+    private fun connectInternal(device: BluetoothDevice) {
+        stopScanOnly()
+        registerBondReceiver()
+        pendingBond = false
+        _connectionState.value = BleConnectionState.Connecting
+        // autoConnect = false for faster initial connection; set true for background reconnect.
+        val autoConnect = reconnectAttempts > 0
+        gatt = device.connectGatt(appContext, autoConnect, gattCallback)
+    }
+
+    private val reconnectRunnable = Runnable {
+        val address = targetAddress ?: return@Runnable
+        val device = devicesByAddress[address]
+            ?: bluetoothAdapter?.getRemoteDevice(address)
+            ?: run {
+                _connectionState.value = BleConnectionState.Error
+                return@Runnable
+            }
+        reconnectAttempts++
+        _connectionState.value = BleConnectionState.Reconnecting
+        @Suppress("DEPRECATION")
+        try {
+            connectInternal(device)
+        } catch (_: SecurityException) {
+            _connectionState.value = BleConnectionState.PermissionMissing
+        }
+    }
+
+    private fun scheduleReconnect() {
+        if (reconnectAttempts >= maxReconnectAttempts) {
+            _connectionState.value = BleConnectionState.Error
+            return
+        }
+        // Exponential back-off: 2s, 4s, 8s … capped at 60s
+        val delayMs = minOf(2_000L shl reconnectAttempts, 60_000L)
+        _connectionState.value = BleConnectionState.Reconnecting
+        mainHandler.postDelayed(reconnectRunnable, delayMs)
+    }
+
+    private fun closeGatt() {
+        mainHandler.post {
+            @Suppress("DEPRECATION")
+            try {
+                gatt?.close()
+            } catch (_: Exception) { }
+            gatt = null
+        }
+    }
+
     @SuppressLint("MissingPermission")
     private fun stopScanOnly() {
+        mainHandler.removeCallbacks(scanTimeoutRunnable)
         val callback = scanCallback ?: return
-        bluetoothAdapter?.bluetoothLeScanner?.stopScan(callback)
+        try {
+            bluetoothAdapter?.bluetoothLeScanner?.stopScan(callback)
+        } catch (_: SecurityException) { }
         scanCallback = null
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Bond receiver
+    // ─────────────────────────────────────────────────────────────────────────
 
     private val bondReceiver = object : BroadcastReceiver() {
         @SuppressLint("MissingPermission")
         override fun onReceive(context: Context, intent: Intent) {
-            val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE) ?: return
-            val bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE)
+            val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                ?: return
+            val bondState = intent.getIntExtra(
+                BluetoothDevice.EXTRA_BOND_STATE,
+                BluetoothDevice.BOND_NONE,
+            )
             when (bondState) {
                 BluetoothDevice.BOND_BONDING -> {
                     _connectionState.value = BleConnectionState.Bonding
@@ -152,14 +261,27 @@ class SmartSuitBleDataSource(
                     _connectionState.value = BleConnectionState.Bonded
                     reconnectGatt(device)
                 }
+                BluetoothDevice.BOND_NONE -> {
+                    // Pairing failed
+                    if (pendingBond) {
+                        pendingBond = false
+                        scheduleReconnect()
+                    }
+                }
             }
         }
     }
 
     @SuppressLint("MissingPermission")
     private fun reconnectGatt(device: BluetoothDevice) {
-        gatt?.close()
-        gatt = device.connectGatt(appContext, false, gattCallback)
+        closeGatt()
+        mainHandler.postDelayed({
+            try {
+                gatt = device.connectGatt(appContext, false, gattCallback)
+            } catch (_: SecurityException) {
+                _connectionState.value = BleConnectionState.PermissionMissing
+            }
+        }, 500L)
     }
 
     private fun registerBondReceiver() {
@@ -175,19 +297,25 @@ class SmartSuitBleDataSource(
         bondReceiverRegistered = false
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // GATT callbacks
+    // ─────────────────────────────────────────────────────────────────────────
+
     private val gattCallback = object : BluetoothGattCallback() {
         @SuppressLint("MissingPermission")
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             if (status != GATT_SUCCESS) {
                 if (!pendingBond) {
-                    _connectionState.value = BleConnectionState.Error
-                    gatt.close()
+                    // Unexpected disconnect or connection failure — schedule reconnect
+                    closeGatt()
+                    scheduleReconnect()
                 }
                 return
             }
 
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
+                    reconnectAttempts = 0  // Reset back-off on successful connection
                     _connectionState.value = BleConnectionState.Connected
                     if (gatt.device.bondState == BluetoothDevice.BOND_BONDED) {
                         _connectionState.value = BleConnectionState.Bonded
@@ -201,7 +329,11 @@ class SmartSuitBleDataSource(
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     if (!pendingBond) {
                         _connectionState.value = BleConnectionState.Disconnected
-                        gatt.close()
+                        closeGatt()
+                        // Auto-reconnect if we have a target address
+                        if (targetAddress != null) {
+                            scheduleReconnect()
+                        }
                     }
                 }
             }
@@ -209,7 +341,13 @@ class SmartSuitBleDataSource(
 
         @SuppressLint("MissingPermission")
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
-            gatt.discoverServices()
+            if (status == GATT_SUCCESS) {
+                gatt.discoverServices()
+            } else {
+                // MTU negotiation failed; proceed with default MTU but warn about ECG payload.
+                // At ATT_MTU 23, 1024-byte ECG will require ~45 packets and may be truncated.
+                gatt.discoverServices()
+            }
         }
 
         @SuppressLint("MissingPermission")
@@ -218,7 +356,6 @@ class SmartSuitBleDataSource(
                 _connectionState.value = BleConnectionState.Error
                 return
             }
-
             notificationQueue = collectNotifyCharacteristics(gatt)
             notificationIndex = 0
             subscribeNext(gatt)
@@ -247,13 +384,17 @@ class SmartSuitBleDataSource(
             status: Int,
         ) {
             if (status != GATT_SUCCESS) {
-                _connectionState.value = BleConnectionState.Error
+                // Descriptor write failed — skip and try next (don't abort all subscriptions)
+                subscribeNext(gatt)
                 return
             }
-
             subscribeNext(gatt)
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Notification subscription queue
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun collectNotifyCharacteristics(gatt: BluetoothGatt): List<BluetoothGattCharacteristic> {
         return listOfNotNull(
@@ -298,32 +439,58 @@ class SmartSuitBleDataSource(
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Notification parsing
+    // ─────────────────────────────────────────────────────────────────────────
+
     private fun handleNotification(uuid: UUID, payload: ByteArray) {
         _telemetry.value = when (uuid) {
             SmartSuitBleContract.BATTERY_LEVEL -> {
-                _telemetry.value.copy(batteryPercent = SmartSuitBleParser.parseBatteryLevel(payload))
+                _telemetry.value.copy(
+                    batteryPercent = SensorFrameValidation.batteryPercent(
+                        SmartSuitBleParser.parseBatteryLevel(payload),
+                    ),
+                )
             }
             SmartSuitBleContract.HEART_RATE_MEASUREMENT -> {
-                _telemetry.value.copy(heartRateBpm = SmartSuitBleParser.parseHeartRateMeasurement(payload))
+                _telemetry.value.copy(
+                    heartRateBpm = SensorFrameValidation.heartRate(
+                        SmartSuitBleParser.parseHeartRateMeasurement(payload),
+                    ),
+                )
             }
             SmartSuitBleContract.PLX_CONTINUOUS_MEASUREMENT -> {
-                _telemetry.value.copy(spo2Percent = SmartSuitBleParser.parsePlxContinuousMeasurement(payload))
+                _telemetry.value.copy(
+                    spo2Percent = SensorFrameValidation.spo2(
+                        SmartSuitBleParser.parsePlxContinuousMeasurement(payload),
+                    ),
+                )
             }
             SmartSuitBleContract.ECG_RAW -> {
-                _telemetry.value.copy(ecgSamples = SensorFrameValidation.ecgSamples(
-                    SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 256),
-                ))
+                _telemetry.value.copy(
+                    ecgSamples = SensorFrameValidation.ecgSamples(
+                        SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 256),
+                    ),
+                )
             }
             SmartSuitBleContract.IMU_WRIST -> {
-                _telemetry.value.copy(wristImu = SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 6))
+                _telemetry.value.copy(
+                    wristImu = SensorFrameValidation.imuSamples(
+                        SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 6),
+                    ),
+                )
             }
             SmartSuitBleContract.SOS_STATE -> {
-                _telemetry.value.copy(sosState = (SmartSuitBleParser.parseUint8(payload) ?: 0) != 0)
+                _telemetry.value.copy(
+                    sosState = (SmartSuitBleParser.parseUint8(payload) ?: 0) != 0,
+                )
             }
             SmartSuitBleContract.FALL_RISK -> {
-                _telemetry.value.copy(fallRisk = SensorFrameValidation.fallRisk(
-                    SmartSuitBleParser.parseFloat32(payload),
-                ))
+                _telemetry.value.copy(
+                    fallRisk = SensorFrameValidation.fallRisk(
+                        SmartSuitBleParser.parseFloat32(payload),
+                    ),
+                )
             }
             SmartSuitBleContract.HUMIDITY -> {
                 val raw = SmartSuitBleParser.parseFloat32Array(payload, expectedCount = 2)
@@ -333,14 +500,18 @@ class SmartSuitBleDataSource(
                 )
             }
             SmartSuitBleContract.RESP_RATE -> {
-                _telemetry.value.copy(respiratoryRate = SensorFrameValidation.respiratoryRate(
-                    SmartSuitBleParser.parseFloat32(payload),
-                ))
+                _telemetry.value.copy(
+                    respiratoryRate = SensorFrameValidation.respiratoryRate(
+                        SmartSuitBleParser.parseFloat32(payload),
+                    ),
+                )
             }
             SmartSuitBleContract.DEVICE_STATE -> {
-                _telemetry.value.copy(deviceState = SensorFrameValidation.deviceState(
-                    SmartSuitBleParser.parseUint8(payload),
-                ))
+                _telemetry.value.copy(
+                    deviceState = SensorFrameValidation.deviceState(
+                        SmartSuitBleParser.parseUint8(payload),
+                    ),
+                )
             }
             else -> _telemetry.value
         }

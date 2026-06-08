@@ -20,6 +20,7 @@
 #include <NimBLEUtils.h>
 #include <NimBLE2902.h>
 #include <math.h>
+#include <esp_task_wdt.h>   // Phase 4: software watchdog
 #include "MAX30105.h"
 #include "heartRate.h"
 #include "spo2_algorithm.h"
@@ -86,6 +87,11 @@ uint8_t g_battValue     = 88;
 uint8_t g_sosValue      = 0;
 uint8_t g_deviceState   = 0;
 uint32_t g_tickCounter  = 0;
+
+// Watchdog timeout (seconds). If loop() does not kick the WDT within this
+// window, the MCU restarts. I²C lockup is the most common cause of silence.
+// The loop runs at ~1 Hz so 15 s gives 15× margin before declaring a hang.
+static const int WDT_TIMEOUT_SEC = 15;
 
 // Battery state — see docs/battery-model.md for the LiPo curve and
 // voltage-divider derivation. R1=100kΩ (top, VBAT) + R2=200kΩ (bottom, GND)
@@ -262,8 +268,15 @@ void setup() {
 
     pinMode(SOS_BTN_PIN, INPUT_PULLUP);
 
+    // ── Software watchdog (Phase 4) ──
+    // Restarts the MCU if loop() stalls for more than WDT_TIMEOUT_SEC seconds.
+    // I²C lockup (MPU-6050 clock-stretching bug) is the primary failure mode.
+    esp_task_wdt_init(WDT_TIMEOUT_SEC, true /*panic-reset*/);
+    esp_task_wdt_add(NULL);  // Watch the current (Arduino loop) task.
+
     // ── I²C bus (shared by MAX30102 and MPU-6050) ──
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+    Wire.setClock(400000);  // 400 kHz Fast Mode
 
     // ── MAX30102 (pulse oximeter) ──
     if (g_particleSensor.begin(Wire, I2C_SPEED_FAST)) {
@@ -275,6 +288,12 @@ void setup() {
         g_maxReady = true;
     } else {
         Serial.println("MAX30102 NOT found — synthetic fallback active");
+        // Phase 4: Reset I²C bus after failed init to prevent bus corruption
+        // that could affect subsequent sensor reads.
+        Wire.end();
+        delay(10);
+        Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+        Wire.setClock(400000);
         g_maxReady = false;
     }
 
@@ -289,9 +308,14 @@ void setup() {
     }
 
     NimBLEDevice::init(DEVICE_NAME);
-    NimBLEDevice::setPower(ESP_PWR_LVL_P9);
-    NimBLEDevice::setSecurityAuth(true, true, true);  // legacy + MITM + secure connections
-    NimBLEDevice::setSecurityIOCap(BLE_HS_IO_KEYBOARD_ONLY);
+    // Phase 8: Reduced from P9 (max) to P3 (~0 dBm) — saves ~5 mA, adequate for
+    // wrist-to-phone range (~2 m). Adjust upward if range is insufficient.
+    NimBLEDevice::setPower(ESP_PWR_LVL_P3);
+    // Phase 8: Switched from KEYBOARD_ONLY to DISPLAY_YESNO so Android can show
+    // a numeric comparison dialog instead of requiring a passkey keyboard entry.
+    // This is compatible with most Android phones without a custom pairing UI.
+    NimBLEDevice::setSecurityAuth(true, true, true);  // bonding + MITM + secure connections
+    NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_YESNO);
     NimBLEDevice::setSecurityCallbacks(&g_securityCallbacks);
 
     g_server = NimBLEDevice::createServer();
@@ -560,6 +584,9 @@ void loop() {
     // ── DEVICE_STATE (uint8: 0=Normal 1=Check 2=Urgent) ──
     g_stateChr->setValue(&g_deviceState, 1);
     g_stateChr->notify();
+
+    // Phase 4: Kick watchdog to prove the loop is not hung.
+    esp_task_wdt_reset();
 
     delay(1000);
 }

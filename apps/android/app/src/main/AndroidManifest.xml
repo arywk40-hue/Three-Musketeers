@@ -1,11 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- BLE permissions (API 31+) -->
     <uses-permission
         android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+
+    <!-- BLE legacy fallback (API ≤ 30) -->
     <uses-permission
         android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
@@ -15,9 +18,39 @@
     <uses-permission
         android:name="android.permission.ACCESS_FINE_LOCATION"
         android:maxSdkVersion="30" />
+
+    <!-- Sensor permissions -->
     <uses-permission android:name="android.permission.BODY_SENSORS" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
+    <!-- Notifications (API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+        Foreground service — required for background BLE monitoring (Phase 4).
+        'health' type requires API 34+. 'connectedDevice' covers API 29+.
+        Both are declared so the service runs correctly on all target API levels.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
+        android:minSdkVersion="34" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_HEALTH"
+        android:minSdkVersion="34" />
+
+    <!--
+        SMS alert path (Phase 7 — CaregiverAlertDispatcher).
+        Enable once caregiver SMS feature is activated. Currently gated by
+        CaregiverAlertDispatcher.dispatch(enableSms = false).
+        Note: Google Play may require justification for SEND_SMS. Consider
+        using a backend (Twilio) to avoid this requirement.
+    -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
+
+    <!-- Location for GPS coordinates in caregiver SMS alerts (Phase 7) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <uses-feature
         android:name="android.hardware.bluetooth_le"
@@ -30,7 +63,7 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
-        tools:targetApi="33">
+        tools:targetApi="34">
 
         <activity
             android:name=".MainActivity"
@@ -40,5 +73,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            Foreground Service for persistent BLE health monitoring (Phase 4).
+            foregroundServiceType="connectedDevice" is required for BLE GATT in background.
+            foregroundServiceType="health" (API 34+) covers health data collection.
+        -->
+        <service
+            android:name=".service.ElderCareMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice|health" />
+
     </application>
 </manifest>

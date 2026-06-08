@@ -22,6 +22,7 @@ import com.smartsuit.notifications.NotificationHelper
 import com.smartsuit.samsung.NoOpSamsungHealthBridge
 import com.smartsuit.samsung.SamsungHealthBridge
 import com.smartsuit.samsung.SamsungHealthState
+import com.smartsuit.service.ElderCareMonitorService
 import com.smartsuit.settings.CaregiverPreferences
 import com.smartsuit.settings.isValidPhone
 import kotlinx.coroutines.Dispatchers
@@ -48,8 +49,11 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     private val _sosOverride = MutableStateFlow(false)
     val sosOverride: StateFlow<Boolean> = _sosOverride.asStateFlow()
 
-    private val _acknowledgedUrgent = MutableStateFlow(false)
-    val acknowledgedUrgent: StateFlow<Boolean> = _acknowledgedUrgent.asStateFlow()
+    private val _acknowledgedEmergency = MutableStateFlow(false)
+    val acknowledgedEmergency: StateFlow<Boolean> = _acknowledgedEmergency.asStateFlow()
+
+    /** Back-compat alias for acknowledgedEmergency (renamed from acknowledgedUrgent). */
+    val acknowledgedUrgent: StateFlow<Boolean> get() = _acknowledgedEmergency
 
     private val _alertHistory = MutableStateFlow<List<AlertEvent>>(emptyList())
     val alertHistory: StateFlow<List<AlertEvent>> = _alertHistory.asStateFlow()
@@ -115,13 +119,22 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
                 val event = alertHistoryTracker.onFrame(frame)
                 if (event != null) {
                     _alertHistory.value = alertHistoryTracker.prepend(_alertHistory.value, event)
-                    if (event.level != CaregiverAlertStatus.Urgent) {
-                        _acknowledgedUrgent.value = false
-                    }
-                    if (event.level == CaregiverAlertStatus.Urgent && !_acknowledgedUrgent.value) {
-                        postUrgentNotification(event)
-                    } else if (event.level != CaregiverAlertStatus.Urgent) {
-                        NotificationHelper.cancelUrgent(getApplication())
+                    when (event.level) {
+                        CaregiverAlertStatus.Emergency -> {
+                            _acknowledgedEmergency.value = false
+                            if (!_acknowledgedEmergency.value) {
+                                postEmergencyNotification(event)
+                            }
+                        }
+                        CaregiverAlertStatus.Warning -> {
+                            NotificationHelper.cancelEmergency(getApplication())
+                            postWarningNotification(event)
+                        }
+                        else -> {
+                            // Check or Normal — cancel any outstanding emergency/warning notifications
+                            NotificationHelper.cancelEmergency(getApplication())
+                            NotificationHelper.cancelWarning(getApplication())
+                        }
                     }
                     viewModelScope.launch(Dispatchers.IO) {
                         db.alertEventDao().insert(event.toEntity())
@@ -172,7 +185,8 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun triggerSosDemo() { _sosOverride.value = true }
     fun clearSosDemo() { _sosOverride.value = false }
-    fun acknowledgeUrgent() { _acknowledgedUrgent.value = true }
+    fun acknowledgeUrgent() { _acknowledgedEmergency.value = true }
+    fun acknowledgeEmergency() { _acknowledgedEmergency.value = true }
 
     /**
      * Persist the caregiver contact. Both fields must be non-blank; the
@@ -194,12 +208,20 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
         return com.smartsuit.notifications.CaregiverContact.dialIntent(phone)
     }
 
-    private fun postUrgentNotification(event: AlertEvent) {
+    private fun postEmergencyNotification(event: AlertEvent) {
         val context = getApplication<Application>()
         val openApp = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-        NotificationHelper.postUrgentAlert(context, event, openApp)
+        NotificationHelper.postEmergencyAlert(context, event, openApp)
+    }
+
+    private fun postWarningNotification(event: AlertEvent) {
+        val context = getApplication<Application>()
+        val openApp = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        NotificationHelper.postWarningAlert(context, event, openApp)
     }
 
     override fun onCleared() {
