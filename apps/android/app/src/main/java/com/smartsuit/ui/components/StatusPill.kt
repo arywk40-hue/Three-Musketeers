@@ -34,8 +34,9 @@ sealed interface PillStatus {
 
 private fun colorFor(status: PillStatus): Color = when (status) {
     is PillStatus.CaregiverAlert -> when (status.level) {
-        CaregiverAlertStatus.Urgent -> Color(0xFFB91C1C)
-        CaregiverAlertStatus.Check -> Color(0xFFB45309)
+        CaregiverAlertStatus.Emergency -> Color(0xFFB91C1C)
+        CaregiverAlertStatus.Warning -> Color(0xFFEA580C)
+        CaregiverAlertStatus.Check -> Color(0xFFD97706)
         CaregiverAlertStatus.Normal -> Color(0xFF0F766E)
     }
     is PillStatus.Posture -> when (status.status) {

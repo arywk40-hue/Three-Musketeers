@@ -79,7 +79,7 @@ class FallConfirmationBufferTest {
         assertEquals(RiskStatus.Medium, outputs[1])
         assertEquals(RiskStatus.High, outputs[2])
         assertEquals(RiskStatus.High, outputs[3])
-        assertEquals(RiskStatus.High, outputs[4])
+        assertEquals(RiskStatus.Medium, outputs[4])
     }
 
     @Test

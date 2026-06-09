@@ -147,8 +147,9 @@ class SmartSuitBleDataSource(
         try {
             val device = devicesByAddress[address] ?: run {
                 // Address known but device object not cached — try to get from adapter.
-                bluetoothAdapter?.getRemoteDevice(address)?.let { devicesByAddress[address] = it }
-                    ?: return
+                val remote = bluetoothAdapter?.getRemoteDevice(address) ?: return
+                devicesByAddress[address] = remote
+                remote
             }
             targetAddress = address
             reconnectAttempts = 0

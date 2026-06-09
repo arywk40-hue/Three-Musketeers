@@ -9,6 +9,11 @@ import kotlin.math.pow
  * [EcgAnomalyDetector] against a known signal.
  */
 internal object SyntheticEcg {
+    fun regularSinusRhythm(bpm: Int, samples: Int, sampleRateHz: Int): List<Float> {
+        val durationSec = samples.toFloat() / sampleRateHz.toFloat()
+        return qrsTrain(hrBpm = bpm, durationSec = durationSec, sampleRateHz = sampleRateHz)
+    }
+
     /**
      * Returns a 1-D ECG signal of [durationSec] seconds at [sampleRateHz]
      * carrying one positive QRS spike per beat at the given [hrBpm].

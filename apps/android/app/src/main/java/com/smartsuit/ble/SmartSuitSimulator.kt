@@ -46,12 +46,12 @@ class SmartSuitSimulator : SmartSuitDataSource {
             val sweatRatePercentPerMin = (0.2f + (dailyWave * 0.4).toFloat() + Random.nextDouble(-0.1, 0.2).toFloat())
                 .coerceIn(0f, 3f)
 
-            val ax = 0.18f * sin(tick * 0.27)
-            val ay = 0.15f * cos(tick * 0.21)
-            val az = 9.81f + 0.20f * sin(tick * 0.13)
-            val gx = 1.2f * sin(tick * 0.11)
-            val gy = 1.0f * cos(tick * 0.09)
-            val gz = 0.8f * sin(tick * 0.07)
+            val ax = (0.18f * sin(tick * 0.27)).toFloat()
+            val ay = (0.15f * cos(tick * 0.21)).toFloat()
+            val az = (9.81f + 0.20f * sin(tick * 0.13)).toFloat()
+            val gx = (1.2f * sin(tick * 0.11)).toFloat()
+            val gy = (1.0f * cos(tick * 0.09)).toFloat()
+            val gz = (0.8f * sin(tick * 0.07)).toFloat()
             val imuMagnitude = InactivityMonitor.magnitude(ax, ay, az)
 
             val fallHighWindow = tick % 47 in 41..46

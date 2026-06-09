@@ -274,7 +274,7 @@ private fun AppShell(
             item {
                 ModeNotice(sessionMode)
             }
-            if (frame.caregiverAlert == CaregiverAlertStatus.Urgent && !acknowledgedUrgent) {
+            if (frame.caregiverAlert == CaregiverAlertStatus.Emergency && !acknowledgedUrgent) {
                 item {
                     UrgentAlertBanner(
                         latestEvent = alertHistory.firstOrNull(),

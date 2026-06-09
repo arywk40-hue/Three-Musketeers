@@ -89,7 +89,7 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
             simFrame
         }
         if (sosActive) {
-            baseFrame.copy(sosActive = true, caregiverAlert = CaregiverAlertStatus.Urgent)
+            baseFrame.copy(sosActive = true, caregiverAlert = CaregiverAlertStatus.Emergency)
         } else {
             baseFrame
         }

@@ -4,17 +4,25 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import net.sqlcipher.database.SupportFactory
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import java.security.SecureRandom
 
 object DatabaseEncryption {
 
+    init {
+        try {
+            System.loadLibrary("sqlcipher")
+        } catch (_: UnsatisfiedLinkError) {
+            // Ignored for JVM host unit tests (Robolectric)
+        }
+    }
+
     private const val PREF_FILE = "eldercare_db_encryption"
     private const val KEY_PASSPHRASE = "sqlcipher_passphrase"
 
-    private var _supportFactory: SupportFactory? = null
+    private var _supportFactory: SupportOpenHelperFactory? = null
 
-    fun supportFactory(context: Context): SupportFactory {
+    fun supportFactory(context: Context): SupportOpenHelperFactory {
         val existing = _supportFactory
         if (existing != null) return existing
 
@@ -36,7 +44,7 @@ object DatabaseEncryption {
             newPass
         }
 
-        return SupportFactory(passphrase.toByteArray()).also { _supportFactory = it }
+        return SupportOpenHelperFactory(passphrase.toByteArray()).also { _supportFactory = it }
     }
 
     private fun generatePassphrase(): String {

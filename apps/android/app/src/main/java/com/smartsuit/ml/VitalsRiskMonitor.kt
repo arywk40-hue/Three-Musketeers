@@ -17,9 +17,9 @@ object VitalsRiskMonitor {
     private const val RR_MOD_LOW = 10
 
     private const val TEMP_HIGH = 38.5f
-    private const val TEMP_LOW = 35.0f
+    private const val TEMP_LOW = 30.0f
     private const val TEMP_MOD_HIGH = 37.8f
-    private const val TEMP_MOD_LOW = 35.5f
+    private const val TEMP_MOD_LOW = 31.0f
 
     data class VitalsRiskAssessment(
         val risk: RiskStatus,
@@ -56,7 +56,7 @@ object VitalsRiskMonitor {
         }
 
         val risk = when {
-            score >= 4 -> RiskStatus.High
+            score >= 3 -> RiskStatus.High
             score >= 2 -> RiskStatus.Medium
             else -> RiskStatus.Low
         }

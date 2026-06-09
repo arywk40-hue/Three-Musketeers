@@ -74,8 +74,9 @@ fun AlertTimeline(
 @Composable
 private fun AlertTimelineRow(event: AlertEvent) {
     val levelColor = when (event.level) {
-        CaregiverAlertStatus.Urgent -> Color(0xFFB91C1C)
-        CaregiverAlertStatus.Check -> Color(0xFFB45309)
+        CaregiverAlertStatus.Emergency -> Color(0xFFB91C1C)
+        CaregiverAlertStatus.Warning -> Color(0xFFEA580C)
+        CaregiverAlertStatus.Check -> Color(0xFFD97706)
         CaregiverAlertStatus.Normal -> Color(0xFF0F766E)
     }
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }

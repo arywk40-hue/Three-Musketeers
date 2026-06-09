@@ -1,7 +1,7 @@
 package com.smartsuit.database
 
 import androidx.test.core.app.ApplicationProvider
-import net.sqlcipher.database.SupportFactory
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -16,7 +16,7 @@ class DatabaseEncryptionTest {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val factory = DatabaseEncryption.supportFactory(ctx)
         assertNotNull(factory)
-        assertTrue(factory is SupportFactory)
+        assertTrue(factory is SupportOpenHelperFactory)
     }
 
     @Test
