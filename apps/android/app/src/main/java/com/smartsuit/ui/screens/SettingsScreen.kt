@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.smartsuit.settings.isValidPhone
 import com.smartsuit.settings.phoneDigitCount
@@ -225,5 +226,18 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.labelSmall,
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SettingsScreenPreview() {
+    MaterialTheme {
+        SettingsScreen(
+            initialName = "John Doe",
+            initialPhone = "+1234567890",
+            onSave = { _, _ -> true },
+            onBack = {}
+        )
     }
 }

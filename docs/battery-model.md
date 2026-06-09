@@ -32,35 +32,40 @@ safely inside the ESP32-C3's 3.3 V ADC reference.
 ```
 vAdc   = (raw / 4095) × 3.3 V
 vBat   = vAdc / 0.667
-percent = (vBat - 3.0) / (4.2 - 3.0) × 100, clamped to [0, 100]
+percent = piecewise_lookup(vBat)    ← 16-entry table, see below
 ```
 
 The firmware averages **8 consecutive ADC samples** per loop tick to
 smooth switching noise. With a 1 Hz loop, this is sufficient resolution
 and keeps the I²C bus and BLE notify path responsive.
 
-## LiPo discharge curve (approximate)
+## LiPo discharge curve (piecewise-linear table)
 
-The current firmware uses a single-segment linear map between
-`vBat = 3.0 V` (0%) and `vBat = 4.2 V` (100%). This is good enough for
-the prototype display but doesn't match real LiPo behaviour:
+The firmware uses a 16-entry piecewise-linear lookup table in `vbatToPercent()`,
+approximating a real LiPo discharge curve from bench measurements:
 
-| Voltage | True % (typical) | Linear-map % | Error |
-|---------|------------------|--------------|-------|
-| 4.20 V  | 100              | 100          | 0     |
-| 3.95 V  | ~85              | 79           | -6    |
-| 3.85 V  | ~65              | 71           | +6    |
-| 3.75 V  | ~45              | 62           | +17   |
-| 3.65 V  | ~25              | 54           | +29   |
-| 3.55 V  | ~12              | 46           | +34   |
-| 3.30 V  | ~3               | 25           | +22   |
-| 3.00 V  | 0                | 0            | 0     |
+| Voltage | Reported % | Segment |
+|---------|-----------|---------|
+| 4.20 V  | 100       | Full    |
+| 4.10 V  | 95        |         |
+| 4.00 V  | 88        |         |
+| 3.90 V  | 78        |         |
+| 3.80 V  | 65        |         |
+| 3.75 V  | 55        | Plateau |
+| 3.70 V  | 45        | (long)  |
+| 3.65 V  | 33        |         |
+| 3.60 V  | 22        |         |
+| 3.55 V  | 15        | Knee    |
+| 3.50 V  | 10        | (fast)  |
+| 3.45 V  | 7         |         |
+| 3.40 V  | 5         |         |
+| 3.35 V  | 3         |         |
+| 3.30 V  | 2         |         |
+| 3.20 V  | 1         | Near empty |
+| ≤ 3.0 V | 0         | Empty   |
 
-The plateau around 3.7 V is long and should map to a narrow percentage
-band; the linear map stretches it across half the gauge, which is
-visually misleading. Once Ariyan measures the actual cell on the bench
-(see calibration procedure below), replace the linear map with a
-piecewise table of `(voltage → percent)` breakpoints.
+This replaces the earlier single-segment linear map, which over-reported
+percent in the 3.6–3.8 V plateau by up to +34 %.
 
 ## Threshold
 
@@ -80,6 +85,9 @@ should expose the threshold as a single shared constant.
 
 ## Calibration procedure (Ariyan, on-bench)
 
+The piecewise table above is a reference approximation. To calibrate against
+your specific cell:
+
 1. Fully charge the LiPo to 4.20 V (verified with a calibrated
    bench DMM at the cell terminals, not at the PCB — there is a small
    IR drop across the protection circuit).
@@ -94,9 +102,8 @@ should expose the threshold as a single shared constant.
    (~50 mA, matching the average draw the wearable pulls in normal
    operation).
 5. Build a `(vBat → truePct)` lookup table from the recorded points.
-6. Replace `vbatToPercent()` in the firmware with a piecewise lookup
-   that interpolates between the recorded points. The single-segment
-   linear function can stay as a fallback if the table is empty.
+6. Update the `CAL_TABLE` array in `main.ino` `vbatToPercent()` with
+   your measured breakpoints. The piecewise interpolator will adapt.
 7. Capture the open-circuit voltage (no load) at 3.7 V — this is the
    value the firmware should report when the wearable is at rest and
    the load is disconnected.

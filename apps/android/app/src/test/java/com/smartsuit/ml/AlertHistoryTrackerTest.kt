@@ -49,12 +49,13 @@ class AlertHistoryTrackerTest {
     }
 
     @Test
-    fun `Normal to Urgent emits an SOS event when SOS active`() = runTest {
+    fun `Normal to Emergency emits an SOS event when SOS active`() = runTest {
         val tracker = AlertHistoryTracker()
         tracker.onFrame(frame(level = CaregiverAlertStatus.Normal))
-        val event = tracker.onFrame(frame(level = CaregiverAlertStatus.Urgent, sos = true))
+        // Emergency replaces Urgent (Phase 7 rename)
+        val event = tracker.onFrame(frame(level = CaregiverAlertStatus.Emergency, sos = true))
         assertNotNull(event)
-        assertEquals(CaregiverAlertStatus.Urgent, event!!.level)
+        assertEquals(CaregiverAlertStatus.Emergency, event!!.level)
         assertEquals(AlertReason.SosButton, event.reason)
     }
 
@@ -71,8 +72,9 @@ class AlertHistoryTrackerTest {
     fun `prepend caps at maxEvents`() {
         val tracker = AlertHistoryTracker(maxEvents = 3)
         val seed = emptyList<com.smartsuit.data.AlertEvent>()
-        val v1 = com.smartsuit.data.AlertEvent(level = CaregiverAlertStatus.Urgent, reason = AlertReason.SosButton)
-        val v2 = com.smartsuit.data.AlertEvent(level = CaregiverAlertStatus.Urgent, reason = AlertReason.SosButton)
+        // Phase 7: Emergency replaces Urgent
+        val v1 = com.smartsuit.data.AlertEvent(level = CaregiverAlertStatus.Emergency, reason = AlertReason.SosButton)
+        val v2 = com.smartsuit.data.AlertEvent(level = CaregiverAlertStatus.Emergency, reason = AlertReason.SosButton)
         val v3 = com.smartsuit.data.AlertEvent(level = CaregiverAlertStatus.Normal, reason = AlertReason.Resolved)
         val v4 = com.smartsuit.data.AlertEvent(level = CaregiverAlertStatus.Check, reason = AlertReason.Inactivity)
         val a = tracker.prepend(seed, v1)
@@ -94,5 +96,14 @@ class AlertHistoryTrackerTest {
         // First frame has no previous → no event. Remaining 99 alternate.
         assertNull(events.first())
         events.drop(1).forEach { assertNotNull(it) }
+    }
+
+    @Test
+    fun `Normal to Warning emits a DeviceAlert event`() = runTest {
+        val tracker = AlertHistoryTracker()
+        tracker.onFrame(frame(level = CaregiverAlertStatus.Normal))
+        val event = tracker.onFrame(frame(level = CaregiverAlertStatus.Warning))
+        assertNotNull(event)
+        assertEquals(CaregiverAlertStatus.Warning, event!!.level)
     }
 }

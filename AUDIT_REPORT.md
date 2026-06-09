@@ -209,18 +209,34 @@ ElderCare Guardian is a genuinely well-conceived prototype. The architecture is 
 
 ## Priority Fix List (Ordered)
 
-1. **[P0] Add BLE auto-reconnect** in `SmartSuitBleDataSource` — reconnect with exponential backoff on disconnect.
-2. **[P0] Add Foreground Service** for background BLE monitoring — this is the #1 safety requirement.
-3. **[P0] Fix fall detection** to use a sliding temporal window, not a single frame.
-4. **[P0] Fix AFib RMSSD logic** — threshold direction is inverted.
-5. **[P1] Remove or prominently disclaimer BloodPressureEstimator** from clinical display.
-6. **[P1] Fix `InactivityMonitor`** to reset counter on detected movement.
-7. **[P1] Add Warning (Level 3) alert state** to `CaregiverAlertPolicy`.
-8. **[P1] Add passkey entry UI** on Android or switch firmware to Numeric Comparison.
-9. **[P1] Add scan timeout** and switch to `SCAN_MODE_BALANCED` after first discovery.
-10. **[P2] Split `SmartSuitApp.kt`** into per-screen files.
-11. **[P2] Rename project** from SmartSuit to ElderCare.
-12. **[P2] Add watchdog timer** to firmware.
-13. **[P2] Add deep sleep** to firmware between notify cycles.
-14. **[P3] Samsung Health real AAR** integration.
-15. **[P3] FCM/SMS caregiver alert path**.
+1. **[P0] Add BLE auto-reconnect** — `reconnectGatt()` after bond; no exponential-backoff for general drops. **Partial.**
+2. **[P0] Add Foreground Service** for background BLE monitoring. **Not done.**
+3. **[P0] Fix fall detection** to use a sliding temporal window. **FallConfirmationBuffer added, single-frame `FallDetectionEngine` unchanged.**
+4. **[P0] Fix AFib RMSSD logic** — threshold direction was inverted. **Fixed.**
+5. **[P1] Remove or prominently disclaimer BloodPressureEstimator** from clinical display. **Not done.**
+6. **[P1] Fix `InactivityMonitor`** to reset counter on detected movement. **Not done.**
+7. **[P1] Add Warning (Level 3) alert state** to `CaregiverAlertPolicy`. **Not done.**
+8. **[P1] Add passkey entry UI** on Android or switch firmware to Numeric Comparison. **KEYBOARD_ONLY + bond receiver + system dialog handles passkey entry.**
+9. **[P1] Add scan timeout** and switch to `SCAN_MODE_BALANCED` after first discovery. **Not done.**
+10. **[P2] Split `SmartSuitApp.kt`** into per-screen files. **Not done.**
+11. **[P2] Rename project** from SmartSuit to ElderCare. **Not done.**
+12. **[P2] Add watchdog timer** to firmware. **Prior session: `esp_task_wdt_init()` added.**
+13. **[P2] Add deep sleep** to firmware between notify cycles. **Not done.**
+14. **[P3] Samsung Health real AAR** integration. **`NoOpSamsungHealthBridge` + `NeedsPartnerApproval` state; real AAR not present.**
+15. **[P3] FCM/SMS caregiver alert path**. **Not done.**
+
+---
+
+### Items Addressed Since Audit
+
+| Item | What Was Done |
+|------|---------------|
+| Room encryption (SQLCipher) | ✅ `DatabaseEncryption.kt`, `SupportFactory`, `eldercare_encrypted.db`, security-model updated |
+| BLE bonding + pairing | ✅ `SecurityCallbacks` on firmware, `BondStateReceiver` + `createBond()` + `reconnectGatt()` on Android, `BleConnectionState.Bonding/Bonded` |
+| Sensor input validation | ✅ `SensorFrameValidation.kt` with per-field bounds (HR, SpO2, RR, humidity, temp, ECG, IMU accel/gyro, fall risk, device state) |
+| LiPo calibration | ✅ Multi-segment piecewise `vbatToPercent()` (16-entry `CAL_TABLE`) replacing single linear map |
+| Samsung Partner UX | ✅ `SamsungHealthState.NeedsPartnerApproval` state + UI text directing to developer.samsung.com |
+| Battery-model doc | ✅ Reflects piecewise table |
+| Firmware README | ✅ Updated to reflect integrated I²C sensors (MAX30102 + MPU-6050), not "Phase 2" |
+| LAUNCH_BLOCKERS statuses | ✅ Status column updated for completed/partially-completed items |
+| build.log | ✅ Four entries for Room encryption, BLE pairing security, sensor validation, LiPo calibration |

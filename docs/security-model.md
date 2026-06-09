@@ -86,20 +86,36 @@ Data SDK v1.1.0 does not use that meta-data.
 
 | Property | Value |
 |---|---|
-| Pairing mode | **Just Works** (no user confirmation) |
-| Bonding | None |
-| MITM protection | **None** |
-| LE Secure Connections | Not used |
+| Pairing mode | **KEYBOARD_ONLY** (passkey entry on phone) |
+| Bonding | Yes (`createBond()` + `ACTION_BOND_STATE_CHANGED`) |
+| MITM protection | **Enabled** (`setSecurityAuth(true, true, true)`) |
+| LE Secure Connections | Enabled |
+| Passkey | Fixed device passkey (123456 — printed to Serial for debugging; production to use per-device PIN on label) |
 
-`Just Works` is acceptable for the showcase because:
-- All transmitted data is synthetic during demos.
+Current state:
+- Firmware: `NimBLEDevice::setSecurityAuth(true, true, true)` + `KEYBOARD_ONLY`
+  IO capability. `SecurityCallbacks` class handles `onPassKeyRequest()`,
+  `onPassKeyNotify()`, `onSecurityRequest()`, and `onAuthenticationComplete()`.
+  Authentication result (bonded, encrypted flags) logged to Serial.
+- Android: `SmartSuitBleDataSource` registers a `BroadcastReceiver` for
+  `ACTION_BOND_STATE_CHANGED`. On `STATE_CONNECTED`, if not yet bonded, calls
+  `BluetoothDevice.createBond()`. Bond receiver handles `BOND_BONDING` /
+  `BOND_BONDED` transitions, triggering `reconnectGatt()` post-bond.
+  CCCD subscription proceeds only after bonding is complete.
+
+Known gap in current build:
+- **Hardcoded passkey 123456** — shared across all devices. Acceptable for
+  prototype testing. Production must use a per-device passkey printed on the
+  enclosure label.
+- **No Android passkey-entry UI** — the phone's system dialog handles passkey
+  entry automatically when the firmware uses `KEYBOARD_ONLY` IO capability.
+  This has been verified to work with Android's BLE stack on API 29+.
+
+Acceptable for the showcase because:
+- All transmitted data is synthetic or prototype-grade.
 - No real patient PII crosses the air.
-
-**Production requirement**: switch to Passkey Entry or Numeric
-Comparison for real patient data. This requires firmware changes (set
-`BLE_SM_PAIR_AUTHREQ_BOND | BLE_SM_PAIR_AUTHREQ_MITM | BLE_SM_PAIR_AUTHREQ_SC`
-in NimBLE's `setSecurityIOCap`) and Android-side bonding wiring
-(`BluetoothDevice.createBond()` + `ACTION_BOND_STATE_CHANGED` listener).
+- Bonding + encryption is enabled, which is more secure than Just Works.
+- The passkey is documented and can be overridden for production.
 
 ### Outbound caregiver notification
 

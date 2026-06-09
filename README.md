@@ -21,13 +21,16 @@ The existing BLE, Samsung Health, simulator, GATT parsing, and Android dashboard
 
 ## Features
 
-**Biometrics monitored**
-- ECG waveform (AD8232) — real-time, 256 Hz
-- SpO2 + heart rate (MAX30102)
-- Blood pressure — estimated via PPG
-- Skin temperature (TMP117)
-- Sweat / humidity (SHT40)
-- Respiratory rate — derived from ECG + IMU
+**Biometrics monitored** *(showcase — real)*
+- SpO2 + heart rate (MAX30102) ✅
+- IMU 6-axis motion (MPU-6050) ✅
+- Battery voltage (ESP32-C3 ADC) ✅
+
+**Biometrics monitored** *(future)*
+- ECG waveform (AD8232) — deferred
+- Blood pressure — estimated via PPG — deferred
+- Skin temperature (TMP117) — optional
+- Sweat / humidity (SHT40) — deferred
 
 **Elder safety**
 - Fall detection — IMU-based impact + posture change
@@ -67,10 +70,10 @@ The earlier TEG, solar, piezo, and smart fabric work is deferred. It remains res
 
 ### MCU + BLE
 
-| Stage | Chip | Why |
-|-------|------|-----|
-| Prototype | ESP32-C3 | Cheap, widely available in India, BLE 5.0 |
-| Final wearable | nRF5340 | BLE 5.3, sleeps at ~1 µA, better for always-on monitoring |
+| Stage | Chip | Why | Status |
+|-------|------|-----|--------|
+| Prototype | ESP32-C3 | Cheap, widely available in India, BLE 5.0 | ✅ Firmware complete |
+| Final wearable | nRF5340 | BLE 5.3, sleeps at ~1 µA, better for always-on monitoring | ⏳ Deferred |
 
 ### Sensor suite
 
@@ -125,26 +128,27 @@ smart-suit-app/
 └── build.gradle
 ```
 
-### ML Models
+### ML Models *(all rule-based for showcase; TFLite models deferred)*
 
-| Model | Input | Output | Algorithm |
-|-------|-------|--------|-----------|
-| ECG anomaly | 256-sample ECG window | Normal / AFib / Tachy / Brady | 1D-CNN |
-| Fall detection | IMU window | Normal / Fall / Inactivity | Rules → ML later |
-| Caregiver alert | Vitals + IMU + SOS | Normal / Check / Urgent | Rule engine |
-| Dehydration risk | Sweat rate, skin temp, HR | Low / Medium / High | Random Forest |
-| Abnormal vitals | HR, SpO2, RR, movement | Safe / Monitor / Alert | XGBoost |
-| BP estimation | PPG waveform features | Systolic / Diastolic mmHg | CNN + regression |
+| Model | Status | Algorithm |
+|-------|--------|-----------|
+| Fall detection | ✅ Rules (FallDetectionEngine + FallConfirmationBuffer) |
+| Caregiver alert triage | ✅ Rules (CaregiverAlertPolicy) |
+| Inactivity monitoring | ✅ Rules (InactivityMonitor) |
+| ECG anomaly | ✅ Rules (EcgAnomalyDetector + HeartRateExtractor) |
+| Dehydration risk | ✅ Rules (DehydrationRiskModel) |
+| Vitals risk | ✅ Rules (VitalsRiskMonitor) |
+| Overexertion | ✅ Rules (OverexertionModel) |
+| BP estimation | ⚠️ Linear model, flagged estimated |
+| TFLite models (1D-CNN, XGBoost, etc.) | ⏳ No model files exist — see `ml/README.md` |
 
-All models run **on-device** via TensorFlow Lite. No server required.
+### Samsung Health Integration *(path designed, not yet active)*
 
-### Samsung Health Integration
+Designed for two Samsung Health SDKs, both requiring partner approval from Samsung:
 
-Uses two Samsung Health SDKs:
+**Accessory SDK** — GATT spec compliance. Standard SIG services (HR 0x180D, PLX 0x1822) are auto-recognised. Custom services need app-side bridging.
 
-**Accessory SDK** — registers the suit as a BLE health device in Samsung Health. Your GATT services must match Samsung's spec exactly. Standard SIG services (HR, SpO2, BP, Temp) are auto-recognised.
-
-**Data SDK** — writes health readings into the user's Samsung Health history from the Android app. Requires Partner App Program approval from Samsung.
+**Data SDK** — writes health readings into Samsung Health history. Local AAR not yet in `libs/`. Current state: `SamsungHealthState.NeedsPartnerApproval`.
 
 Reference: https://developer.samsung.com/health
 

@@ -2,9 +2,10 @@
 
 ElderCare Guardian BLE GATT server for the prototype wearable.
 
-> I2C sensor reading (MAX30102 + MPU-6050) is a Phase 2 task.
-> This sketch ships synthetic data so the Android app's BLE pipeline can
-> be exercised end-to-end. All custom characteristic UUIDs match
+> MAX30102 (HR + SpO2) and MPU-6050 (IMU) I²C drivers are integrated.
+> If a sensor fails to initialise the firmware falls back to synthetic
+> data so the BLE pipe and Android dashboard stay usable for testing.
+> All custom characteristic UUIDs match
 > `apps/android/app/src/main/java/com/smartsuit/ble/SmartSuitBleContract.kt`.
 
 ---
@@ -24,8 +25,8 @@ ElderCare Guardian BLE GATT server for the prototype wearable.
 | VBAT   | Battery    | GPIO 4     | ADC1_CH4 via R1=100kΩ + R2=200kΩ divider |
 
 MAX30102 and MPU-6050 share the same I²C bus (SDA = GPIO6, SCL = GPIO7).
-Phase 2 firmware will add the I²C drivers and replace the synthetic block in
-`loop()` with real sensor reads.
+The firmware reads both sensors on every loop tick; if either fails to
+initialise, its synthetic fallback path keeps the BLE pipe alive.
 
 SOS button is active-low. Pressing it pulls GPIO9 to GND; the firmware
 mirrors this state onto the `SOS_STATE` characteristic (0 = off, 1 = active)
@@ -56,17 +57,12 @@ respiratory rate.
 
 ---
 
-## Phase 2 — real sensor integration
+## Firmware features
 
-Replace the synthetic block at the top of `loop()` with:
-
-```cpp
-// MAX30102 — poll HR + SpO2 over I²C (0x57)
-readMax30102(hrBpm, spo2Pct);
-
-// MPU-6050 — read accel + gyro (0x68)
-readMpu6050(ax, ay, az, gx, gy, gz);
-```
-
-The notification payloads and timings stay identical, so the Android
-parser and dashboard continue to work without changes.
+- **BLE GATT server** with NimBLE-Arduino, advertising as `ElderCare_v1`.
+- **MAX30102** HR + SpO2 with beat detection and Maxim SpO2 algorithm (100-sample buffer).
+- **MPU-6050** IMU with real accelerometer/gyro data.
+- **SOS button** on GPIO 9 (active-low, INPUT_PULLUP).
+- **Battery ADC** on GPIO 4 with 8-sample rolling average and piecewise LiPo curve.
+- **BLE security:** bonding + MITM (KEYBOARD_ONLY), passkey entry with `SecurityCallbacks`.
+- **Synthetic fallback:** if a sensor fails to init, the characteristic notifies synthetic data so the Android app always sees a live stream.

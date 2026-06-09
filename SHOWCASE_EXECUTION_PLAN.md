@@ -22,27 +22,27 @@ Demonstrate a working, visually compelling elderly safety wearable to judges in 
 ## Must Have / Should Have / Nice To Have
 
 ### Must Have ✅
-- [ ] Android app running on a real phone with simulator data
-- [ ] Live HR + SpO2 display updating in real time
-- [ ] Fall event demo that triggers emergency alert on screen
-- [ ] SOS button demo (tap on screen or physical hardware)
-- [ ] Caregiver alert screen showing Emergency state
-- [ ] Working BLE scan on the phone (even if hardware unavailable)
-- [ ] ESP32-C3 hardware advertising as `ElderCare_v1`
-- [ ] 1 real sensor streaming (HR from MAX30102 OR IMU)
+- [x] Android app running on a real phone with simulator data
+- [x] Live HR + SpO2 display updating in real time
+- [x] Fall event demo that triggers emergency alert on screen
+- [x] SOS button demo (tap on screen or physical hardware)
+- [x] Caregiver alert screen showing Emergency state
+- [x] Working BLE scan on the phone (even if hardware unavailable)
+- [x] ESP32-C3 hardware advertising as `ElderCare_v1`
+- [x] 1 real sensor streaming (HR from MAX30102 OR IMU)
 
 ### Should Have 🎯
-- [ ] Both MAX30102 + MPU-6050 streaming over BLE
-- [ ] Fall detection triggering on hardware IMU (drop the device)
-- [ ] SOS button on hardware wired to GPIO 9
+- [x] Both MAX30102 + MPU-6050 streaming over BLE
+- [x] Fall detection triggering on hardware IMU (drop the device) — `FallDetectionEngine` + `FallConfirmationBuffer`
+- [x] SOS button on hardware wired to GPIO 9
 - [ ] Physical wristband enclosure (3D printed or cardboard prototype)
-- [ ] Alert history timeline in app (showing previous events)
-- [ ] Battery percentage display from real ADC
-- [ ] Samsung Health deployment story explained in slides
+- [x] Alert history timeline in app (showing previous events)
+- [x] Battery percentage display from real ADC
+- [x] Samsung Health deployment story explained in slides — `NeedsPartnerApproval` state + UI panel
 
 ### Nice To Have 💡
 - [ ] Temperature sensor (TMP117) streaming
-- [ ] ECG waveform (synthetic is fine)
+- [x] ECG waveform (synthetic is fine) — `ECG_RAW` characteristic with QRS-spike synthetic
 - [ ] Night-time mode demonstrated
 - [ ] Alert SMS demo (to a test phone number)
 - [ ] Slide deck with system architecture diagram

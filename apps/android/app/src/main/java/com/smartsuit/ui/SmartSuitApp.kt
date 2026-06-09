@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.smartsuit.ble.BleConnectionState
@@ -1246,4 +1247,68 @@ private fun fatigueProgress(status: FatigueStatus): Float = when (status) {
     FatigueStatus.Safe -> 0.25f
     FatigueStatus.Caution -> 0.65f
     FatigueStatus.Stop -> 0.95f
+}
+
+@Preview(showBackground = true, name = "Vitals Dashboard")
+@Composable
+private fun AppShellVitalsPreview() {
+    val mockFrame = SensorFrame(
+        timestampMillis = System.currentTimeMillis(),
+        heartRateBpm = 72,
+        spo2Percent = 98.5f,
+        systolicMmHg = 120,
+        diastolicMmHg = 80,
+        skinTempC = 36.6f,
+        humidityPercent = 45f,
+        respiratoryRate = 14,
+        posture = PostureStatus.Good,
+        fatigue = FatigueStatus.Safe,
+        dehydration = RiskStatus.Low,
+        fallRisk = RiskStatus.Low,
+        caregiverAlert = CaregiverAlertStatus.Normal,
+        sosActive = false,
+        inactivityMinutes = 0,
+        supercapPercent = 90,
+        ecgSamples = List(50) { (kotlin.math.sin(it.toFloat() * 0.5f)) },
+        batteryPercent = 85
+    )
+
+    MaterialTheme(
+        colorScheme = MaterialTheme.colorScheme.copy(
+            primary = Color(0xFF0F766E),
+            secondary = Color(0xFF2563EB),
+            surface = Color(0xFFFFFFFF),
+            background = Color(0xFFF8FAFC),
+        )
+    ) {
+        AppShell(
+            frame = mockFrame,
+            selectedTab = AppTab.Vitals,
+            onTabSelected = {},
+            sessionMode = SessionMode.Demo,
+            onSessionModeSelected = {},
+            missingPermissions = emptyList(),
+            onRequestPermissions = {},
+            bleConnectionState = BleConnectionState.Connected,
+            discoveredDevices = emptyList(),
+            bleTelemetry = SmartSuitBleTelemetry(),
+            samsungState = SamsungHealthState.Ready,
+            sosOverride = false,
+            acknowledgedUrgent = false,
+            alertHistory = emptyList(),
+            hrTrend = List(20) { 70f + it % 5 },
+            spo2Trend = List(20) { 98f + it % 2 },
+            caregiverDisplayName = "Jane Doe",
+            caregiverPhoneNumber = "+1234567890",
+            onCallCaregiver = {},
+            onStartBleScan = {},
+            onStopBle = {},
+            onConnectFirstDevice = {},
+            onStartSamsung = {},
+            onTriggerSosDemo = {},
+            onClearSosDemo = {},
+            onAcknowledgeUrgent = {},
+            onUpdateCaregiverContact = { _, _ -> true }
+        )
+    }
 }

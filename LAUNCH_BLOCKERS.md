@@ -130,23 +130,23 @@ Moving to a custom PCB requires: PCB design (KiCad), component sourcing, PCBA ve
 ## Summary Table
 
 | Blocker | Severity | Status | Fix ETA |
-|---|---|---|---|
-| B01: No remote caregiver alert | 🔴 P0 | Not fixed | Week 2 |
-| B02: Fall detection not validated | 🔴 P0 | Fixed (not validated) | Week 3 |
-| B03: BP display clinically invalid | 🔴 P0 | Not fixed | Day 1 |
+|---|---|---|---|---|
+| B01: No remote caregiver alert | 🔴 P0 | Not fixed | Showcase defer |
+| B02: Fall detection not validated | 🔴 P0 | Temporal window applied (FallConfirmationBuffer), not bench-validated | Ongoing |
+| B03: BP display clinically invalid | 🔴 P0 | Not fixed — flagged `isEstimated=true`, needs prominent disclaimer | Day 1 |
 | B04: AFib logic inverted | 🔴 P0 | Fixed this session | Done |
-| B05: No background service | 🔴 P0 | Fixed (needs wiring) | Day 2 |
-| B06: BLE drop shows simulator | 🔴 P0 | Fixed (auto-reconnect) | Done |
-| B07: Medical claims language | 🟠 P1 | Not fixed | Week 2 |
-| B08: No consent flow | 🟠 P1 | Not fixed | Week 2 |
-| B09: Hardcoded BLE passkey | 🟠 P1 | Improved (YESNO) | Done |
-| B10: No data export/retention UI | 🟠 P1 | Not fixed | Week 3 |
-| B11: No privacy policy / ToS | 🟠 P1 | Not fixed | Week 2 |
-| B12: No firmware watchdog | 🟡 P2 | Fixed this session | Done |
-| B13: No low-battery caregiver alert | 🟡 P2 | Partially (Check alert) | Done |
-| B14: Single point of failure | 🟡 P2 | Not fixed | Months |
-| B15: Threshold not elderly-validated | 🟡 P2 | Not fixed | Week 3 |
-| B16: SpO2 quality indicator | 🟡 P2 | Not fixed | Week 3 |
+| B05: No background service | 🔴 P0 | Not fixed (needs wiring) | Showcase defer |
+| B06: BLE drop shows simulator | 🔴 P0 | Partial fix — `reconnectGatt()` after bond; no exponential-backoff auto-reconnect on general drop | Done |
+| B07: Medical claims language | 🟠 P1 | Not fixed | Showcase defer |
+| B08: No consent flow | 🟠 P1 | Not fixed | Showcase defer |
+| B09: Hardcoded BLE passkey | 🟠 P1 | KEYBOARD_ONLY + bond receiver implemented; passkey still 123456 | Done |
+| B10: No data export/retention UI | 🟠 P1 | Not fixed | Showcase defer |
+| B11: No privacy policy / ToS | 🟠 P1 | Not fixed | Showcase defer |
+| B12: No firmware watchdog | 🟡 P2 | Fixed in prior session (esp_task_wdt_init) | Done |
+| B13: No low-battery caregiver alert | 🟡 P2 | Firmware: `BATT_LOW_PCT` + piecewise LiPo curve. Android: `CaregiverAlertPolicy` triggers Check at < 15% | Done |
+| B14: Single point of failure | 🟡 P2 | Not fixed | Showcase defer |
+| B15: Threshold not elderly-validated | 🟡 P2 | Not fixed | Showcase defer |
+| B16: SpO2 quality indicator | 🟡 P2 | Not fixed | Showcase defer |
 | B17: Differentiation story weak | 🟢 P3 | Marketing problem | Ongoing |
 | B18: Competitor moats | 🟢 P3 | Strategy problem | Ongoing |
 | B19: PCB manufacturing | 🟢 P3 | Later | Post-pilot |
