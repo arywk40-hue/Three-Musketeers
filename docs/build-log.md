@@ -1,5 +1,73 @@
 # Build Log
 
+## 2026-06-10 (Session 3)
+
+Repo health pass — Android Studio/emulator readiness and documentation consistency.
+
+Android Studio readiness:
+- Changed BLE feature declaration from required to optional in `AndroidManifest.xml`
+  so emulator installs can run simulator/demo mode.
+- Verified `./gradlew testDebugUnitTest` and `./gradlew assembleDebug` after the
+  manifest change.
+
+Documentation cleanup:
+- `apps/android/README.md` now distinguishes emulator simulator mode from real
+  phone BLE testing and physical Samsung Health testing.
+- `dependencies.md`, `workflow.md`, `architecture.md`, and firmware docs updated
+  to reflect the current `com.eldercareguardian` package and numeric-comparison
+  BLE pairing model.
+- `docs/security-model.md` corrected to describe the current SQLCipher encrypted
+  Room database instead of the old plaintext state.
+- `PRODUCT_GAPS.md` corrected to mark DPDPA consent as implemented and keep the
+  hosted privacy policy / ToS as the remaining public-release gap.
+
+## 2026-06-10 (Session 2)
+
+Project finalization — package rename, signing, DPDPA consent, documentation.
+
+Package rename:
+- Full rename from `com.smartsuit` → `com.eldercareguardian` across 59 source files.
+- `rootProject.name` → `ElderCareGuardian` in settings.gradle.kts.
+- `namespace` and `applicationId` → `com.eldercareguardian` in build.gradle.kts.
+- Source directory tree moved: `com/smartsuit/` → `com/eldercareguardian/` (main + test).
+- All package declarations and import statements updated via bulk sed.
+
+Signing configuration:
+- Generated `eldercare-release.jks` (RSA 2048-bit, 10000-day validity, SHA256withRSA).
+- Created `keystore.properties` (gitignored) for credential externalization.
+- `signingConfigs.release` reads from `keystore.properties` at build time.
+- `buildTypes.release` configured with R8 minification + resource shrinking.
+- `.gitignore` added for `keystore.properties`, `*.jks`, `*.keystore`.
+
+ProGuard rules:
+- Created `app/proguard-rules.pro` with keep rules for Room entities/DAOs,
+  SQLCipher native code, Gson serialization, DataStore, Compose, and
+  ElderCare data classes used in BLE parsing.
+
+DPDPA consent screen:
+- `ConsentPreferences.kt` — DataStore wrapper for `dpdpa_consent_granted`
+  boolean with grant/revoke methods and audit timestamp.
+- `DpdpaConsentScreen.kt` — full-screen Compose consent UI with four
+  sections (What We Collect, How It's Stored, Who Can Access, Your Rights
+  Under DPDPA), consent checkbox, and "Accept & Continue" button.
+- `MainActivity.kt` gates the app behind consent check — shows consent
+  screen until accepted, then loads SmartSuitApp.
+
+Version bump:
+- `versionCode` 1 → 2, `versionName` 0.1.0 → 0.2.0.
+
+Documentation updates:
+- LAUNCH_BLOCKERS.md: B05 (background service) and B08 (DPDPA consent)
+  marked as fixed. Summary table updated. P0 count 6 → 4, P1 count 5 → 3.
+- AUDIT_REPORT.md: Project rename, signing config, ProGuard, 4-level alert
+  system, foreground service permissions marked as fixed. Deployment
+  readiness score 2/10 → 4/10. Five new "Items Addressed" rows added.
+- README.md: Module structure updated to com/eldercareguardian/, alert
+  states updated to 4-level system, DPDPA consent noted, version → 0.2.0.
+- docs/build-log.md: This entry.
+
+---
+
 ## 2026-06-11
 
 Blocker #3 — BLE pairing security (bonding + MITM).

@@ -7,35 +7,21 @@ Phase 1/2 work and should be promoted onto it before production rollout.
 
 ## Data at rest
 
-### Room database (`eldercare.db`)
+### Room database (`eldercare_encrypted.db`)
 
 Stores `AlertEventEntity` rows — alert level, reason, timestamp. The Room
-file is **not encrypted at rest** in the current build.
+file is encrypted at rest in the current build with SQLCipher.
 
 | Decision | Value |
 |---|---|
-| At-rest encryption | **None** (SQLCipher not integrated) |
-| Threat-model acceptance | Acceptable for showcase / Phase 2 single-user testing |
-| Production requirement | **Encrypt before any real patient data lands on a device** |
+| At-rest encryption | SQLCipher via Room `SupportFactory` |
+| Key storage | AndroidKeyStore-backed `EncryptedSharedPreferences` |
+| Current limitation | No user-authentication gate on DB unlock yet |
 
-Why we ship without SQLCipher right now:
-- Showcase demo runs on dev devices with no real patient data.
-- SQLCipher adds an AAR dependency, key-management responsibility
-  (Android Keystore wrap), and migration friction.
-- Pranay/Pratyush need to weigh the operational cost of key loss
-  (a forgotten Keystore alias = total data loss) against the threat of
-  the device falling into the wrong hands.
-
-Threats the **current** unencrypted DB is exposed to:
-- Adversary with physical access to an unlocked device.
-- Adversary with root access on a rooted device.
-- Backup extraction via `adb` (mitigated by `allowBackup="false"`).
-- A future code change that accidentally opts in to backup.
-
-Threats the **current** unencrypted DB is **not** exposed to:
-- Network adversary (no cloud sync yet).
-- Compromised app process reading a different sandboxed app (Android
-  UID isolation).
+Threats the current encrypted DB still depends on:
+- Android device lock integrity.
+- AndroidKeyStore availability.
+- No root compromise of the app process while the app is running.
 
 Production hardening checklist:
 - [x] Integrate `net.zetetic:android-database-sqlcipher` + `androidx.sqlite:sqlite`.
@@ -86,14 +72,14 @@ Data SDK v1.1.0 does not use that meta-data.
 
 | Property | Value |
 |---|---|
-| Pairing mode | **KEYBOARD_ONLY** (passkey entry on phone) |
+| Pairing mode | **DISPLAY_YESNO** numeric comparison |
 | Bonding | Yes (`createBond()` + `ACTION_BOND_STATE_CHANGED`) |
 | MITM protection | **Enabled** (`setSecurityAuth(true, true, true)`) |
 | LE Secure Connections | Enabled |
-| Passkey | Fixed device passkey (123456 — printed to Serial for debugging; production to use per-device PIN on label) |
+| Passkey | Fixed debug comparison value (123456 — production to use per-device random pairing material) |
 
 Current state:
-- Firmware: `NimBLEDevice::setSecurityAuth(true, true, true)` + `KEYBOARD_ONLY`
+- Firmware: `NimBLEDevice::setSecurityAuth(true, true, true)` + `DISPLAY_YESNO`
   IO capability. `SecurityCallbacks` class handles `onPassKeyRequest()`,
   `onPassKeyNotify()`, `onSecurityRequest()`, and `onAuthenticationComplete()`.
   Authentication result (bonded, encrypted flags) logged to Serial.
@@ -107,8 +93,8 @@ Known gap in current build:
 - **Hardcoded passkey 123456** — shared across all devices. Acceptable for
   prototype testing. Production must use a per-device passkey printed on the
   enclosure label.
-- **No Android passkey-entry UI** — the phone's system dialog handles passkey
-  entry automatically when the firmware uses `KEYBOARD_ONLY` IO capability.
+- **No custom Android passkey-entry UI** — the phone's system pairing dialog handles
+  numeric comparison automatically when the firmware uses `DISPLAY_YESNO`.
   This has been verified to work with Android's BLE stack on API 29+.
 
 Acceptable for the showcase because:

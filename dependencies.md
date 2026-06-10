@@ -35,7 +35,7 @@ The Samsung Health Accessory SDK is **a GATT compatibility specification documen
 | Kotlin | 2.0.x |
 | Android Studio | Ladybug (2024.2.1) or later |
 | Gradle | 8.x |
-| No emulator support | Both Samsung SDKs require real hardware |
+| Emulator support | Android app simulator mode works on an emulator; BLE and Samsung Health require real hardware |
 
 ---
 
@@ -54,13 +54,13 @@ After download, unzip and copy the `.aar` file into your project's `app/libs/` f
 ## Project Structure
 
 ```
-smart-suit-app/
+apps/android/
 ├── app/
 │   ├── libs/
 │   │   ├── health-data-api-1.0.0.aar       ← Samsung Health Data SDK
 │   │   └── samsung-health-sensor-api.aar   ← Samsung Health Sensor SDK (if using Galaxy Watch)
 │   ├── src/main/
-│   │   ├── java/com/smartsuit/
+│   │   ├── java/com/eldercareguardian/
 │   │   │   ├── ble/
 │   │   │   ├── samsung/
 │   │   │   ├── ml/
@@ -126,15 +126,15 @@ plugins {
 }
 
 android {
-    namespace = "com.smartsuit"
+    namespace = "com.eldercareguardian"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.smartsuit"
+        applicationId = "com.eldercareguardian"
         minSdk = 29                 // ← Samsung Health Data SDK minimum
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     compileOptions {

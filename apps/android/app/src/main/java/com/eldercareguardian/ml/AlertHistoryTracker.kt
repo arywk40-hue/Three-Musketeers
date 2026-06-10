@@ -1,0 +1,54 @@
+package com.eldercareguardian.ml
+
+import com.eldercareguardian.data.AlertEvent
+import com.eldercareguardian.data.AlertReason
+import com.eldercareguardian.data.CaregiverAlertStatus
+import com.eldercareguardian.data.RiskStatus
+import com.eldercareguardian.data.SensorFrame
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/**
+ * Thread-safe stateful detector for alert-level transitions.
+ *
+ * Extracted from SmartSuitViewModel so the read/mutate of [previousLevel] is
+ * serialised by an internal [Mutex] rather than relying on the single-collector
+ * guarantee of a viewModelScope launch. This keeps the alert-history append
+ * correct under any future `flowOn(Dispatchers.IO)` change.
+ */
+class AlertHistoryTracker(private val maxEvents: Int = 50) {
+    private val mutex = Mutex()
+    private var previousLevel: CaregiverAlertStatus? = null
+
+    suspend fun onFrame(frame: SensorFrame): AlertEvent? = mutex.withLock {
+        val current = frame.caregiverAlert
+        val previous = previousLevel
+        previousLevel = current
+        if (previous == null || current == previous) {
+            null
+        } else {
+            AlertEvent(level = current, reason = reasonFor(frame, current))
+        }
+    }
+
+    fun prepend(history: List<AlertEvent>, event: AlertEvent): List<AlertEvent> =
+        (listOf(event) + history).take(maxEvents)
+
+    private fun reasonFor(frame: SensorFrame, current: CaregiverAlertStatus): AlertReason =
+        when {
+            frame.sosActive -> AlertReason.SosButton
+            frame.fallRisk == RiskStatus.High -> AlertReason.FallDetected
+            frame.heartRateBpm > 130 -> AlertReason.HeartRateHigh
+            frame.heartRateBpm < 40 -> AlertReason.HeartRateLow
+            frame.spo2Percent < 90f -> AlertReason.LowSpO2
+            frame.fallRisk == RiskStatus.Medium -> AlertReason.FallDetected
+            frame.heartRateBpm > 110 -> AlertReason.HeartRateHigh
+            frame.heartRateBpm < 50 -> AlertReason.HeartRateLow
+            frame.spo2Percent < 94f -> AlertReason.LowSpO2
+            // Night threshold is 5 min; day is 20 min — pick the lower (conservative) in reason
+            frame.inactivityMinutes >= InactivityMonitor.NIGHT_INACTIVITY_THRESHOLD_MINUTES -> AlertReason.Inactivity
+            frame.batteryPercent != null && frame.batteryPercent < 15 -> AlertReason.LowBattery
+            current == CaregiverAlertStatus.Normal -> AlertReason.Resolved
+            else -> AlertReason.DeviceAlert
+        }
+}

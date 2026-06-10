@@ -15,5 +15,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SmartSuit"
+rootProject.name = "ElderCareGuardian"
 include(":app")

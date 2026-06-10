@@ -40,7 +40,7 @@
 
     <uses-feature
         android:name="android.hardware.bluetooth_le"
-        android:required="true" />
+        android:required="false" />
 
     <application
         android:allowBackup="false"

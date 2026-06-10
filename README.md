@@ -4,7 +4,7 @@
 
 **Team:** Pranay · Ariyan · Reman Dey  
 **Institution:** IIT Mandi  
-**Version:** 1.0 — Prototype Stage  
+**Version:** 0.2.0 — Pre-Release  
 **Date:** June 2026
 
 ---
@@ -36,18 +36,19 @@ The existing BLE, Samsung Health, simulator, GATT parsing, and Android dashboard
 - Fall detection — IMU-based impact + posture change
 - SOS trigger — app and device-side emergency event
 - Inactivity monitoring — no movement for unusual duration
-- Caregiver alert state — Normal / Check / Urgent
+- Caregiver alert state — Normal / Check / Warning / Emergency
 
 **Health alerts**
 - ECG anomaly detection: Normal / AFib / Tachycardia / Bradycardia
 - Dehydration risk: Low / Medium / High
-- Fall risk: Normal / Check / Urgent
+- Fall risk: Low / Medium / High
 - Abnormal vitals: Safe / Monitor / Alert
 
 **Platform**
 - Samsung Health integration — HR, SpO2, BP, Temp written to Health history
 - "Works With Samsung Health" BLE Accessory SDK compliance
 - Caregiver dashboard — live status, alert level, BLE readiness, and health trend
+- DPDPA consent flow — mandatory first-launch consent under India's Digital Personal Data Protection Act 2023
 
 ---
 
@@ -118,14 +119,18 @@ Android app scaffold → see [`apps/android`](./apps/android)
 ### Android App — module structure
 
 ```
-smart-suit-app/
-├── app/src/main/java/com/smartsuit/
+eldercare-guardian-app/
+├── app/src/main/java/com/eldercareguardian/
 │   ├── ble/              # BLE scan, GATT client, frame parser
+│   ├── consent/          # DPDPA consent screen and DataStore
 │   ├── samsung/          # Samsung Health Data SDK wrapper
-│   ├── ml/               # TFLite model runners (ECG, IMU, tabular)
+│   ├── ml/               # Rule-based engines (ECG, IMU, vitals)
+│   ├── database/         # Room + SQLCipher encrypted persistence
+│   ├── notifications/    # Caregiver alert dispatcher
+│   ├── service/          # Foreground service for background monitoring
 │   └── ui/               # Jetpack Compose screens
-├── model/                # .tflite model files
-└── build.gradle
+├── model/                # .tflite model files (deferred)
+└── build.gradle.kts
 ```
 
 ### ML Models *(all rule-based for showcase; TFLite models deferred)*

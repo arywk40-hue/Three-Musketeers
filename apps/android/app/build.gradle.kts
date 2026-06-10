@@ -6,16 +6,49 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+import java.util.Properties
+
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val hasKeystore = keystorePropertiesFile.exists()
+val props = Properties()
+if (hasKeystore) { props.load(keystorePropertiesFile.inputStream()) }
+val ksStoreFile = props.getProperty("storeFile") ?: ""
+val ksStorePassword = props.getProperty("storePassword") ?: ""
+val ksKeyAlias = props.getProperty("keyAlias") ?: ""
+val ksKeyPassword = props.getProperty("keyPassword") ?: ""
+
 android {
-    namespace = "com.smartsuit"
+    namespace = "com.eldercareguardian"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.smartsuit"
+        applicationId = "com.eldercareguardian"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+    }
+
+    if (hasKeystore) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(ksStoreFile)
+                storePassword = ksStorePassword
+                keyAlias = ksKeyAlias
+                keyPassword = ksKeyPassword
+            }
+        }
+        buildTypes {
+            release {
+                isMinifyEnabled = true
+                isShrinkResources = true
+                proguardFiles(
+                    getDefaultProguardFile("proguard-android-optimize.txt"),
+                    "proguard-rules.pro"
+                )
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
     }
 
     compileOptions {

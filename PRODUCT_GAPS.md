@@ -133,8 +133,8 @@ The simulator produces believable vitals and safety events. The fall detection t
 **Required:** Legal review of product claims. Remove "ECG anomaly detection" language from marketing if not FDA-cleared. Use "wellness monitoring" language instead.
 
 ### 5.2 Informed Consent & Privacy Policy
-**Gap:** No consent flow for health data collection.  
-**Required:** On-boarding consent screen: what data is collected, how it is stored, who can access it.  
+**Status:** In-app DPDPA consent exists and gates first launch before health data collection.  
+**Remaining gap:** No hosted privacy policy / Terms URL for Play Store or public distribution.  
 **India requirement:** Digital Personal Data Protection Act 2023 (DPDPA) requires explicit consent for sensitive personal data (health data).
 
 ### 5.3 HIPAA / DPDPA Data Handling
@@ -169,7 +169,7 @@ The simulator produces believable vitals and safety events. The fall detection t
 | Daily wellness report | 🟡 Medium | Medium | P2 |
 | Medication reminder | 🟡 Medium | Medium | P2 |
 | Device removal detection | 🟡 Medium | Low | P2 |
-| DPDPA consent flow | 🟡 Medium | Low | P2 |
+| Hosted privacy policy / ToS | 🟡 Medium | Low | P2 |
 | Medical claims legal review | 🟡 Medium | Low | P2 |
 | Emergency services integration | 🟡 Medium | High | P3 |
 | NFC medical ID card | 🟢 Low | Low | P3 |

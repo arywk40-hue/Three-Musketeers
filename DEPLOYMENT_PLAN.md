@@ -22,20 +22,20 @@ Each track has independent timelines and can progress in parallel.
 ## Track A — Android Play Store Deployment
 
 ### Pre-requisites
-1. Rename package from `com.smartsuit` → `com.eldercareguardian`
-2. Set `applicationId = "com.eldercareguardian"`
+1. Rename package from `com.smartsuit` → `com.eldercareguardian` ✅ Done
+2. Set `applicationId = "com.eldercareguardian"` ✅ Done
 3. Create a Google Play Developer account (₹1,750 one-time fee)
 4. Set up release signing keystore (`keytool -genkey ...`)
 5. Configure `signingConfig` in `build.gradle.kts`
 
 ### Build Checklist
-- [ ] Enable R8 minification in `buildTypes.release`
-- [ ] Create `proguard-rules.pro` with Room, SQLCipher, Gson rules
+- [x] Enable R8 minification in `buildTypes.release`
+- [x] Create `proguard-rules.pro` with Room, SQLCipher, Gson rules
 - [ ] Set `versionCode` auto-increment in CI
 - [ ] Fill `AndroidManifest.xml` with `android:icon`, `android:roundIcon`
 - [ ] Create app icon (512×512 PNG + adaptive icon)
 - [ ] Write app description, screenshots for Play Store listing
-- [ ] Set `targetSdkVersion = 35` (required for new apps on Play)
+- [x] Set `targetSdkVersion = 35` (required for new apps on Play)
 - [ ] Handle `SEND_SMS` permission — Play Store requires justification
 
 ### Play Store Policy Compliance

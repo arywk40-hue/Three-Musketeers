@@ -33,10 +33,10 @@ This means normal patients would receive AFib alerts, and actual AFib patients m
 **Phase 5/6 fix applied** in this session. Verify by running the corrected test against real ECG data.  
 **Status:** Fixed but not yet validated on clinical data.
 
-### B05: No Background Monitoring Service
+### B05: No Background Monitoring Service ✅ FIXED
 **When the Android app is backgrounded (screen off), monitoring stops completely.**  
 For elderly safety, monitoring must be 24/7. A patient who has a fall at 3 AM with the screen off receives no protection.  
-**Phase 4 fix:** `ElderCareMonitorService` Foreground Service added. Needs to be wired into `MainActivity.onCreate()`.
+**Fix applied:** `ElderCareMonitorService` Foreground Service created and wired into `MainActivity.onCreate()`. Service runs with `connectedDevice|health` foreground type.
 
 ### B06: BLE Drops Are Silent to the User
 **Before Phase 3 fix:** If BLE disconnects, the app silently shows simulator data. The caregiver sees "Normal" vitals while the sensor is not actually reading the patient.  
@@ -53,10 +53,9 @@ Under the US FDA (SaMD framework), India CDSCO (MDR 2017), and EU MDR, a softwar
 **Fix required:** Replace medical diagnosis language with wellness indicators. "Irregular rhythm detected — consult a doctor" is safer than "AFib confirmed."  
 **Or:** Pursue formal regulatory clearance (expensive, time-consuming, but unlocks commercial sale).
 
-### B08: No DPDPA Consent Flow
+### B08: No DPDPA Consent Flow ✅ FIXED
 **India's Digital Personal Data Protection Act 2023 (DPDPA) requires explicit user consent before collecting sensitive health data.**  
-The current app has no consent screen on first launch.  
-**Fix required:** Add a consent dialog explaining what data is collected, how it is stored, and who can access it.
+**Fix applied:** Full-screen `DpdpaConsentScreen` shown on first launch before any health data collection. Covers: data collected, storage method (SQLCipher AES-256), access scope, and DPDPA rights (withdraw, delete, export). Consent state persisted via DataStore with audit timestamp. User can withdraw consent from Settings.
 
 ### B09: Hardcoded BLE Passkey 123456
 **Any device in Bluetooth range can attempt to pair with the wearable using the default passkey.**  
@@ -130,20 +129,20 @@ Moving to a custom PCB requires: PCB design (KiCad), component sourcing, PCBA ve
 ## Summary Table
 
 | Blocker | Severity | Status | Fix ETA |
-|---|---|---|---|---|
+|---|---|---|---|
 | B01: No remote caregiver alert | 🔴 P0 | Not fixed | Showcase defer |
 | B02: Fall detection not validated | 🔴 P0 | Temporal window applied (FallConfirmationBuffer), not bench-validated | Ongoing |
 | B03: BP display clinically invalid | 🔴 P0 | Not fixed — flagged `isEstimated=true`, needs prominent disclaimer | Day 1 |
-| B04: AFib logic inverted | 🔴 P0 | Fixed this session | Done |
-| B05: No background service | 🔴 P0 | Not fixed (needs wiring) | Showcase defer |
-| B06: BLE drop shows simulator | 🔴 P0 | Partial fix — `reconnectGatt()` after bond; no exponential-backoff auto-reconnect on general drop | Done |
+| B04: AFib logic inverted | 🔴 P0 | ✅ Fixed | Done |
+| B05: No background service | 🔴 P0 | ✅ Fixed — `ElderCareMonitorService` wired into `MainActivity` | Done |
+| B06: BLE drop shows simulator | 🔴 P0 | Partial fix — `reconnectGatt()` after bond | Done |
 | B07: Medical claims language | 🟠 P1 | Not fixed | Showcase defer |
-| B08: No consent flow | 🟠 P1 | Not fixed | Showcase defer |
-| B09: Hardcoded BLE passkey | 🟠 P1 | KEYBOARD_ONLY + bond receiver implemented; passkey still 123456 | Done |
+| B08: No consent flow | 🟠 P1 | ✅ Fixed — `DpdpaConsentScreen` with DataStore persistence | Done |
+| B09: Hardcoded BLE passkey | 🟠 P1 | DISPLAY_YESNO + bond receiver; passkey still 123456 | Done |
 | B10: No data export/retention UI | 🟠 P1 | Not fixed | Showcase defer |
 | B11: No privacy policy / ToS | 🟠 P1 | Not fixed | Showcase defer |
-| B12: No firmware watchdog | 🟡 P2 | Fixed in prior session (esp_task_wdt_init) | Done |
-| B13: No low-battery caregiver alert | 🟡 P2 | Firmware: `BATT_LOW_PCT` + piecewise LiPo curve. Android: `CaregiverAlertPolicy` triggers Check at < 15% | Done |
+| B12: No firmware watchdog | 🟡 P2 | ✅ Fixed (esp_task_wdt_init) | Done |
+| B13: No low-battery caregiver alert | 🟡 P2 | ✅ Fixed — firmware + Android CaregiverAlertPolicy | Done |
 | B14: Single point of failure | 🟡 P2 | Not fixed | Showcase defer |
 | B15: Threshold not elderly-validated | 🟡 P2 | Not fixed | Showcase defer |
 | B16: SpO2 quality indicator | 🟡 P2 | Not fixed | Showcase defer |
@@ -151,7 +150,14 @@ Moving to a custom PCB requires: PCB design (KiCad), component sourcing, PCBA ve
 | B18: Competitor moats | 🟢 P3 | Strategy problem | Ongoing |
 | B19: PCB manufacturing | 🟢 P3 | Later | Post-pilot |
 
-**P0 count: 6** — None of these are acceptable for any real-patient deployment.  
-**P1 count: 5** — Required for commercial deployment and Play Store.  
+**Additional completed items (this session):**
+- ✅ Package renamed from `com.smartsuit` → `com.eldercareguardian`
+- ✅ `rootProject.name` → `ElderCareGuardian`
+- ✅ Release signing keystore + `signingConfig` configured
+- ✅ ProGuard/R8 rules added for Room, SQLCipher, Gson
+- ✅ 4-level caregiver alert system (`Normal` / `Check` / `Warning` / `Emergency`)
+
+**P0 count: 4** (was 6; B04 + B05 fixed).  
+**P1 count: 3** (was 5; B08 fixed, B09 improved).  
 **P2 count: 5** — Required for pilot deployment.  
 **P3 count: 3** — Required for product-market fit and commercial success.

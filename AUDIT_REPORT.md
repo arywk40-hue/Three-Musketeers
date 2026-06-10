@@ -51,16 +51,16 @@ ElderCare Guardian is a genuinely well-conceived prototype. The architecture is 
 
 ### Weaknesses
 - `SmartSuitApp.kt` is 50 KB — a single monolithic Compose file containing all screens. This will become unmaintainable quickly. It needs to be split into individual screen files.
-- `rootProject.name = "SmartSuit"` — the project is still named SmartSuit in `settings.gradle.kts`. Package name is `com.smartsuit`. Both should be renamed to `eldercare` or `eldercareguardian`.
-- No `ProGuard`/`R8` rules file. If minification is enabled, reflection-based code (Room, SQLCipher, Gson) will break.
+- ~~`rootProject.name = "SmartSuit"` — the project is still named SmartSuit. Package name is `com.smartsuit`.~~ **✅ FIXED** — Renamed to `ElderCareGuardian` / `com.eldercareguardian`.
+- ~~No `ProGuard`/`R8` rules file.~~ **✅ FIXED** — `proguard-rules.pro` added with keep rules for Room, SQLCipher, Gson, DataStore.
 - `BloodPressureEstimator` uses a naive linear regression on HR + skin temperature — clinically invalid and must be prominently labeled or removed from production.
-- `build.gradle.kts` has no `signingConfig` for release builds.
-- No `versionCode` update strategy — stays at 1.
-- Missing `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_HEALTH` permissions for background monitoring.
+- ~~`build.gradle.kts` has no `signingConfig` for release builds.~~ **✅ FIXED** — Release signing with keystore.properties, R8 minification, resource shrinking.
+- No `versionCode` update strategy — ~~stays at 1~~ bumped to 2 (v0.2.0).
+- Missing `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_HEALTH` permissions for background monitoring. **✅ FIXED** — Both added to manifest.
 - Missing `ACCESS_BACKGROUND_LOCATION` (needed on API 30 for BLE scan in background on some devices).
 
 ### Code Patterns
-- `CaregiverAlertPolicy` only has 2 levels (Normal / Check / Urgent). The prompt specifies 4 levels. Level 3 "Warning" is missing.
+- ~~`CaregiverAlertPolicy` only has 2 levels (Normal / Check / Urgent). The prompt specifies 4 levels. Level 3 "Warning" is missing.~~ **✅ FIXED** — 4-level system: `Normal` / `Check` / `Warning` / `Emergency`.
 - `InactivityMonitor.assess()` accumulates `inactivitySeconds` across the app session but never resets on movement — once you hit the 20-minute threshold, it stays in Check forever until app restart.
 - `FallDetectionEngine.assess()` operates on a **single IMU sample** (one frame of 6 floats). Real fall detection needs a temporal window of 50–200 samples. The current approach generates false positives from any vibration or tap.
 
@@ -78,7 +78,7 @@ ElderCare Guardian is a genuinely well-conceived prototype. The architecture is 
 ### Weaknesses
 - **No auto-reconnect on unexpected disconnect.** If the wearable goes out of range and comes back, the Android app does nothing. The user must manually reconnect.
 - **Fixed passkey 123456** in firmware `SecurityCallbacks::onPassKeyRequest()`. This is documented and known but still ships. In production this is a critical vulnerability — any nearby device can pair.
-- **KEYBOARD_ONLY IO capability** on the firmware side requires the Android phone to enter a passkey. But the Android app has no passkey entry UI. Pairing will silently fail or fall back to Just Works depending on device.
+- Firmware now uses `DISPLAY_YESNO` numeric comparison, so Android can rely on the system pairing dialog. Production still needs per-device pairing material instead of the fixed debug value.
 - The `BLUETOOTH_ADVERTISE` permission is declared in the manifest but the Android app never advertises — this is unnecessary noise.
 - BLE scan mode is `SCAN_MODE_LOW_LATENCY` (high power). For a health monitoring app that scans repeatedly, this drains the phone battery fast. Should switch to `SCAN_MODE_BALANCED` after initial discovery.
 - No scan timeout — the scan runs forever until explicitly stopped.
@@ -133,7 +133,7 @@ ElderCare Guardian is a genuinely well-conceived prototype. The architecture is 
 - `allowBackup="false"` + data extraction rules: ✅ **Done**
 - BLE bond receiver + reconnect after bond: ✅ **Done**
 - BLE passkey entry (firmware side): ⚠️ **Hardcoded 123456 — not production-safe**
-- Android passkey entry UI: ❌ **Missing — pairing will fail with KEYBOARD_ONLY**
+- Android passkey entry UI: ✅ **Custom UI not required for current `DISPLAY_YESNO` numeric comparison; system dialog handles pairing**
 - BLE encryption in flight: ⚠️ **Just Works fallback is likely active due to missing Android UI**
 - Network transport: ✅ **No cloud — all local (acceptable for prototype)**
 - No server-side component: ✅ **Correct for prototype**
@@ -203,7 +203,7 @@ ElderCare Guardian is a genuinely well-conceived prototype. The architecture is 
 | **Security** | 5/10 | SQLCipher done, BLE passkey hardcoded, no SMS/push path |
 | **Reliability** | 4/10 | No auto-reconnect, no watchdog, no background service |
 | **Maintainability** | 6/10 | Good architecture, but 50KB monolithic Compose file, two conflicting firmware versions |
-| **Deployment Readiness** | 2/10 | No Samsung AAR, no Play Store signing, no background monitoring, no FCM |
+| **Deployment Readiness** | 4/10 | Package renamed, signing configured, DPDPA consent added, ProGuard rules set. Samsung AAR + FCM still missing. |
 
 ---
 
@@ -215,11 +215,11 @@ ElderCare Guardian is a genuinely well-conceived prototype. The architecture is 
 4. **[P0] Fix AFib RMSSD logic** — threshold direction was inverted. **Fixed.**
 5. **[P1] Remove or prominently disclaimer BloodPressureEstimator** from clinical display. **Not done.**
 6. **[P1] Fix `InactivityMonitor`** to reset counter on detected movement. **Not done.**
-7. **[P1] Add Warning (Level 3) alert state** to `CaregiverAlertPolicy`. **Not done.**
-8. **[P1] Add passkey entry UI** on Android or switch firmware to Numeric Comparison. **KEYBOARD_ONLY + bond receiver + system dialog handles passkey entry.**
+7. **[P1] Add Warning (Level 3) alert state** to `CaregiverAlertPolicy`. **✅ Done — 4-level system implemented.**
+8. **[P1] Add passkey entry UI** on Android or switch firmware to Numeric Comparison. **Numeric comparison + bond receiver + system dialog handles pairing.**
 9. **[P1] Add scan timeout** and switch to `SCAN_MODE_BALANCED` after first discovery. **Not done.**
 10. **[P2] Split `SmartSuitApp.kt`** into per-screen files. **Not done.**
-11. **[P2] Rename project** from SmartSuit to ElderCare. **Not done.**
+11. **[P2] Rename project** from SmartSuit to ElderCare. **✅ Done — `com.eldercareguardian`, `ElderCareGuardian`.**
 12. **[P2] Add watchdog timer** to firmware. **Prior session: `esp_task_wdt_init()` added.**
 13. **[P2] Add deep sleep** to firmware between notify cycles. **Not done.**
 14. **[P3] Samsung Health real AAR** integration. **`NoOpSamsungHealthBridge` + `NeedsPartnerApproval` state; real AAR not present.**
@@ -240,3 +240,8 @@ ElderCare Guardian is a genuinely well-conceived prototype. The architecture is 
 | Firmware README | ✅ Updated to reflect integrated I²C sensors (MAX30102 + MPU-6050), not "Phase 2" |
 | LAUNCH_BLOCKERS statuses | ✅ Status column updated for completed/partially-completed items |
 | build.log | ✅ Four entries for Room encryption, BLE pairing security, sensor validation, LiPo calibration |
+| Package rename | ✅ `com.smartsuit` → `com.eldercareguardian`, `rootProject.name` → `ElderCareGuardian`, directory tree migrated |
+| Signing config | ✅ `eldercare-release.jks` keystore, `keystore.properties`, `signingConfigs.release` in `build.gradle.kts` |
+| ProGuard rules | ✅ `proguard-rules.pro` with keep rules for Room, SQLCipher, Gson, DataStore, Compose, security-crypto |
+| DPDPA consent screen | ✅ `DpdpaConsentScreen.kt` + `ConsentPreferences.kt` — mandatory first-launch gate before health data collection |
+| 4-level alert system | ✅ `CaregiverAlertStatus.Emergency` + `Warning` added across `StatusPill`, `AlertTimeline`, `SmartSuitApp`, `SmartSuitViewModel` |

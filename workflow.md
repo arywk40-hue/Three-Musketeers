@@ -48,7 +48,7 @@ Any custom services (IMU, humidity, respiratory) go into vendor-specific GATT se
 smart-suit-app/
 ├── app/
 │   ├── src/main/
-│   │   ├── java/com/smartsuit/
+│   │   ├── java/com/eldercareguardian/
 │   │   │   ├── ble/          # BLE scan + GATT client
 │   │   │   ├── samsung/      # Samsung Health Data SDK wrapper
 │   │   │   ├── ml/           # TFLite model runners

@@ -6,7 +6,7 @@ ElderCare Guardian BLE GATT server for the prototype wearable.
 > If a sensor fails to initialise the firmware falls back to synthetic
 > data so the BLE pipe and Android dashboard stay usable for testing.
 > All custom characteristic UUIDs match
-> `apps/android/app/src/main/java/com/smartsuit/ble/SmartSuitBleContract.kt`.
+> `apps/android/app/src/main/java/com/eldercareguardian/ble/SmartSuitBleContract.kt`.
 
 ---
 
@@ -64,5 +64,5 @@ respiratory rate.
 - **MPU-6050** IMU with real accelerometer/gyro data.
 - **SOS button** on GPIO 9 (active-low, INPUT_PULLUP).
 - **Battery ADC** on GPIO 4 with 8-sample rolling average and piecewise LiPo curve.
-- **BLE security:** bonding + MITM (KEYBOARD_ONLY), passkey entry with `SecurityCallbacks`.
+- **BLE security:** bonding + MITM with numeric comparison (`DISPLAY_YESNO`) through `SecurityCallbacks`.
 - **Synthetic fallback:** if a sensor fails to init, the characteristic notifies synthetic data so the Android app always sees a live stream.

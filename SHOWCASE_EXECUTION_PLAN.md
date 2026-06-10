@@ -81,7 +81,7 @@ Demonstrate a working, visually compelling elderly safety wearable to judges in 
 **Owner: Pranay**
 
 **Goals:**
-- Android app builds and runs on a real phone (not emulator)
+- Android app builds and runs on an emulator in simulator mode, and on a real phone for BLE testing
 - BLE connect to `ElderCare_v1` works end-to-end
 - All 4 tabs (Vitals, Safety, Caregiver, Readiness) look polished
 - Fall demo flow works: trigger → alert → screen changes to Emergency
@@ -91,7 +91,7 @@ Demonstrate a working, visually compelling elderly safety wearable to judges in 
 
 | Day | Task |
 |---|---|
-| 8 | Open `apps/android` in Android Studio. Build + run on physical device |
+| 8 | Open `apps/android` in Android Studio. Build + run on emulator first, then physical device for BLE |
 | 9 | Fix any build errors. Verify simulator dashboard runs smoothly |
 | 10 | Test BLE scan → connect → data display with hardware from Week 1 |
 | 11 | Polish Vitals tab: large readable numbers, ECG waveform animation |

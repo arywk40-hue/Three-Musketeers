@@ -30,9 +30,9 @@ Hardware work is split into bench validation and a simple elder-care wearable pr
 - USB rechargeable battery or small LiPo for the showcase.
 - Optional removable strap for comfort testing.
 
-## Embedded Firmware
+## Legacy Bluetooth Serial Firmware
 
-The `hardware/embedded` folder contains the microcontroller firmware for the wearable prototype:
+The `hardware/embedded` folder contains the legacy Bluetooth Serial proof-of-concept:
 
 - `embedded.ino` - main Arduino sketch. It initializes sensors and Bluetooth, then runs two task loops:
   - high-frequency ECG sampling at 256 Hz,
@@ -123,4 +123,4 @@ void sendLowFrequencyPacket(BiometricData data) {
 }
 ```
 
-> The `embedded.ino` sketch must be uploaded to the microcontroller for the wearable prototype to operate.
+> For Android integration testing, flash `firmware/esp32-c3/main.ino`, not this legacy sketch.

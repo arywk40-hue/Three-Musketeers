@@ -203,7 +203,7 @@ Android App
 │   ├── OverexertionModel.kt        HR-reserve % + SpO2 drop + RR + IMU: Safe/Caution/Stop
 │   ├── BloodPressureEstimator.kt   HR + skin-temp linear model; isEstimated=true
 │   ├── VitalsRiskMonitor.kt        Composite 4-vital score: Low/Medium/High
-│   └── CaregiverAlertPolicy.kt     Triage: SOS/HR/SpO2/fall/ECG/vitals → Normal/Check/Urgent
+│   └── CaregiverAlertPolicy.kt     Triage: SOS/HR/SpO2/fall/ECG/vitals → Normal/Check/Warning/Emergency
 │
 └── UI (Jetpack Compose)
     ├── VitalsScreen    — ECG waveform + HR, SpO2, RR cards
@@ -355,7 +355,7 @@ SensorFrame merged in SensorFrameMerger (BLE wins over simulator on overlap)
         │
         ├──► HR + skinTemp                ──► BloodPressureEstimator
         │
-        └──► All above outputs            ──► CaregiverAlertPolicy (triage → Normal/Check/Urgent)
+        └──► All above outputs            ──► CaregiverAlertPolicy (triage → Normal/Check/Warning/Emergency)
                 │
                 ▼
         AlertHistoryTracker.onFrame() → AlertEvent on level transition → Room + notification

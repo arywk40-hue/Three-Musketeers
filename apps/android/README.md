@@ -24,7 +24,20 @@ Use:
 - Android Studio Ladybug or later.
 - JDK 17.
 - Android SDK 35.
-- Real phone for BLE and Samsung Health testing.
+- Android emulator for simulator/demo mode.
+- Real BLE-capable phone for BLE wearable testing.
+- Physical Samsung phone for Samsung Health SDK testing.
+
+## Emulator Support
+
+The app can run on an Android Studio virtual device in simulator mode. The
+simulator path does not require BLE hardware, Samsung Health, or the local
+Samsung SDK AAR.
+
+Use a physical device for:
+- BLE scan/connect to `ElderCare_v1`.
+- Runtime Bluetooth permission behavior.
+- Samsung Health Data SDK testing.
 
 ## Samsung Health Notes
 

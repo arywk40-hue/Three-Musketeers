@@ -1,0 +1,22 @@
+# Build outputs
+*.apk
+*.aab
+build/
+.gradle/
+.kotlin/
+
+# IDE
+.idea/
+*.iml
+
+# Local config
+local.properties
+keystore.properties
+*.jks
+*.keystore
+
+# Heap dumps
+*.hprof
+
+# OS
+.DS_Store
