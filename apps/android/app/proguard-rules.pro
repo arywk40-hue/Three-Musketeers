@@ -41,3 +41,14 @@
 
 # ── Security ──
 -keep class androidx.security.crypto.** { *; }
+
+# ── Samsung Health SDK ──
+-keep class com.samsung.android.sdk.** { *; }
+-dontwarn com.samsung.android.sdk.**
+
+# ── Nordic Semiconductor BLE libraries ──
+-keep class no.nordicsemi.** { *; }
+-dontwarn no.nordicsemi.**
+
+# ── Bluetooth GATT callbacks ──
+-keepclassmembers class * extends android.bluetooth.BluetoothGattCallback { *; }
