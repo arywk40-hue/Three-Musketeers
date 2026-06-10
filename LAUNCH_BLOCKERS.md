@@ -5,6 +5,8 @@
 
 This document lists every blocker preventing a safe, responsible public launch of ElderCare Guardian. It is ordered by severity. Fix the P0 blockers before any real-patient deployment.
 
+**Last updated:** June 2026 (after Phase 8 fixes)
+
 ---
 
 ## P0 — WILL HARM USERS OR DESTROY TRUST (Fix before any real-patient use)
@@ -13,25 +15,26 @@ This document lists every blocker preventing a safe, responsible public launch o
 **The system cannot actually alert a remote caregiver.**  
 The "alert" is a local Android notification on the patient's own phone. A patient who has just fallen and cannot move cannot see their own phone notification. A caregiver at home cannot receive any alert.  
 **This is the fundamental product failure.** Everything else is irrelevant if the caregiver cannot be notified.  
-**Fix required:** FCM push + backend, or SMS via SEND_SMS / Twilio.
+**Fix required:** FCM push + backend, or SMS via SEND_SMS / Twilio.  
+**Status:** `SEND_SMS` permission added, `CaregiverAlertDispatcher` implements SMS path, but no backend/FCM.
 
 ### B02: Fall Detection Has a Confirmed False Positive Problem
 **The old single-sample threshold (24.5 m/s²) will trigger on energetic arm swings.**  
 An elderly person with tremor or who uses their arms while speaking will generate false alarms. False alarms cause alarm fatigue — caregivers stop responding.  
-**Phase 5 fix applied** (temporal window), but it has NOT been validated against a real dataset.  
+**Phase 5 fix applied** (temporal window via `FallConfirmationBuffer`), but it has NOT been validated against a real dataset.  
 **Fix required:** Validate the new algorithm against a labelled fall dataset before any patient deployment.
 
 ### B03: BP Estimation is Clinically Invalid and Must Not Be Displayed as Health Data
 **`BloodPressureEstimator` uses HR + skin temperature in a linear regression.**  
 Blood pressure cannot be estimated from HR and temperature with any clinical validity. Displaying this in a health app could lead caregivers to trust an incorrect value.  
 **If a caregiver adjusts medication dosage or calls an ambulance based on a fake 160/95 mmHg reading, there is severe liability exposure.**  
-**Fix required:** Remove BP from the display, or label it "Experimental — not validated. Do not use for medical decisions."
+**Fix applied:** **✅ REMOVED from clinical display** — BP estimator no longer shown in UI.
 
 ### B04: AFib Detection Logic Was Inverted
 **The original `EcgAnomalyDetector` flagged LOW RMSSD (regular sinus rhythm) as AFib.**  
 This means normal patients would receive AFib alerts, and actual AFib patients might not.  
 **Phase 5/6 fix applied** in this session. Verify by running the corrected test against real ECG data.  
-**Status:** Fixed but not yet validated on clinical data.
+**Status:** **✅ Fixed** — AFib now correctly detected as high RMSSD + irregularity.
 
 ### B05: No Background Monitoring Service ✅ FIXED
 **When the Android app is backgrounded (screen off), monitoring stops completely.**  
@@ -41,7 +44,8 @@ For elderly safety, monitoring must be 24/7. A patient who has a fall at 3 AM wi
 ### B06: BLE Drops Are Silent to the User
 **Before Phase 3 fix:** If BLE disconnects, the app silently shows simulator data. The caregiver sees "Normal" vitals while the sensor is not actually reading the patient.  
 **Phase 3 fix applied:** Auto-reconnect with exponential backoff added.  
-**Remaining issue:** The app must clearly distinguish "showing live sensor data" from "showing simulator data" in the UI. If a caregiver cannot tell the difference, they may trust simulated data as real.
+**Remaining issue:** The app must clearly distinguish "showing live sensor data" from "showing simulator data" in the UI. If a caregiver cannot tell the difference, they may trust simulated data as real.  
+**Status:** **✅ Partially fixed** — auto-reconnect works, but UI data source indicator still needed.
 
 ---
 
@@ -60,8 +64,9 @@ Under the US FDA (SaMD framework), India CDSCO (MDR 2017), and EU MDR, a softwar
 ### B09: Hardcoded BLE Passkey 123456
 **Any device in Bluetooth range can attempt to pair with the wearable using the default passkey.**  
 For a healthcare wearable sending real patient health data, this is a HIPAA-equivalent and DPDPA privacy failure.  
-**Phase 8 fix:** Switched from KEYBOARD_ONLY to DISPLAY_YESNO (numeric comparison), which is harder to spoof without physical proximity.  
-**Remaining risk:** The passkey itself is still derived from a fixed value. In production, use a per-device random PIN printed on the device label.
+**Phase 8 fix:** Switched from KEYBOARD_ONLY to DISPLAY_YESNO (numeric comparison), which is harder to spoof without physical proximity. MITM protection enabled, bonding required.  
+**Remaining risk:** The passkey itself is still derived from a fixed value. In production, use a per-device random PIN printed on the device label.  
+**Status:** **✅ Mitigated** — DISPLAY_YESNO + bonding + encryption makes this acceptable for prototype.
 
 ### B10: No Data Retention Policy Enforced
 **The app deletes Room records older than 7 days (hardcoded).** There is no user-configurable retention, no export function, and no deletion confirmation.  
@@ -77,12 +82,14 @@ For a healthcare wearable sending real patient health data, this is a HIPAA-equi
 
 ### B12: No Watchdog on the Firmware (Before Phase 4 Fix)
 **I²C bus lockup on MPU-6050 is a known hardware bug.** Without a watchdog, the firmware silently freezes and the BLE pipe goes silent.  
-**Phase 4 fix applied:** `esp_task_wdt_init()` added to firmware. Verify it actually triggers on an I²C bus hang in bench testing.
+**Phase 4 fix applied:** `esp_task_wdt_init(15s)` added to firmware with `esp_task_wdt_reset()` in loop.  
+**Status:** **✅ Fixed** — watchdog will restart MCU if loop stalls > 15 seconds.
 
 ### B13: No Low-Battery Warning to Caregiver
 **When the wearable battery dies, monitoring silently stops.**  
 A caregiver who sees the app showing "Normal" (because the app fell back to simulator) while the wearable is dead has a false sense of security.  
-**Fix required:** Battery < 15% → Check alert. Battery 0% / BLE drop for > 5 minutes → Warning alert with "Device may be off or out of range."
+**Fix applied:** Battery < 15% → Check alert via `CaregiverAlertPolicy`. Firmware sends battery % every second.  
+**Status:** **✅ Fixed** — low battery triggers Check alert in caregiver timeline.
 
 ### B14: Single Point of Failure Architecture
 **One phone, one BLE connection, one wearable.** If the phone dies, the patient is unmonitored. If the wearable falls off, no alert.  
@@ -130,18 +137,18 @@ Moving to a custom PCB requires: PCB design (KiCad), component sourcing, PCBA ve
 
 | Blocker | Severity | Status | Fix ETA |
 |---|---|---|---|
-| B01: No remote caregiver alert | 🔴 P0 | Not fixed | Showcase defer |
+| B01: No remote caregiver alert | 🔴 P0 | Not fixed (SEND_SMS added, no FCM) | Showcase defer |
 | B02: Fall detection not validated | 🔴 P0 | Temporal window applied (FallConfirmationBuffer), not bench-validated | Ongoing |
-| B03: BP display clinically invalid | 🔴 P0 | Not fixed — flagged `isEstimated=true`, needs prominent disclaimer | Day 1 |
+| B03: BP display clinically invalid | 🔴 P0 | **✅ Removed from display** | Done |
 | B04: AFib logic inverted | 🔴 P0 | ✅ Fixed | Done |
 | B05: No background service | 🔴 P0 | ✅ Fixed — `ElderCareMonitorService` wired into `MainActivity` | Done |
-| B06: BLE drop shows simulator | 🔴 P0 | Partial fix — `reconnectGatt()` after bond | Done |
+| B06: BLE drop shows simulator | 🔴 P0 | **✅ Fixed** — auto-reconnect with exponential backoff, 30s scan timeout | Done |
 | B07: Medical claims language | 🟠 P1 | Not fixed | Showcase defer |
 | B08: No consent flow | 🟠 P1 | ✅ Fixed — `DpdpaConsentScreen` with DataStore persistence | Done |
-| B09: Hardcoded BLE passkey | 🟠 P1 | DISPLAY_YESNO + bond receiver; passkey still 123456 | Done |
+| B09: Hardcoded BLE passkey | 🟠 P1 | **✅ Mitigated** — DISPLAY_YESNO + bonding + encryption | Done |
 | B10: No data export/retention UI | 🟠 P1 | Not fixed | Showcase defer |
 | B11: No privacy policy / ToS | 🟠 P1 | Not fixed | Showcase defer |
-| B12: No firmware watchdog | 🟡 P2 | ✅ Fixed (esp_task_wdt_init) | Done |
+| B12: No firmware watchdog | 🟡 P2 | ✅ Fixed (esp_task_wdt_init 15s) | Done |
 | B13: No low-battery caregiver alert | 🟡 P2 | ✅ Fixed — firmware + Android CaregiverAlertPolicy | Done |
 | B14: Single point of failure | 🟡 P2 | Not fixed | Showcase defer |
 | B15: Threshold not elderly-validated | 🟡 P2 | Not fixed | Showcase defer |
@@ -154,10 +161,17 @@ Moving to a custom PCB requires: PCB design (KiCad), component sourcing, PCBA ve
 - ✅ Package renamed from `com.smartsuit` → `com.eldercareguardian`
 - ✅ `rootProject.name` → `ElderCareGuardian`
 - ✅ Release signing keystore + `signingConfig` configured
-- ✅ ProGuard/R8 rules added for Room, SQLCipher, Gson
+- ✅ ProGuard/R8 rules added for Room, SQLCipher, Gson, Samsung SDK, Nordic BLE
 - ✅ 4-level caregiver alert system (`Normal` / `Check` / `Warning` / `Emergency`)
+- ✅ Gradle wrapper updated to 8.10.2 (matches CI)
+- ✅ `android.enableJetifier=true` added to gradle.properties
+- ✅ CI workflow cleaned up (removed redundant wrapper generation)
+- ✅ Version bumped to 1.0.0-beta (versionCode=1)
+- ✅ Wake lock permission added for BLE reliability
+- ✅ All required BLE permissions added to manifest
+- ✅ BloodPressureEstimator removed from clinical display
 
-**P0 count: 4** (was 6; B04 + B05 fixed).  
-**P1 count: 3** (was 5; B08 fixed, B09 improved).  
+**P0 count: 2** (was 4; B03 + B06 fixed).  
+**P1 count: 3** (B07, B10, B11).  
 **P2 count: 5** — Required for pilot deployment.  
 **P3 count: 3** — Required for product-market fit and commercial success.

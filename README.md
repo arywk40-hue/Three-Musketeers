@@ -4,7 +4,7 @@
 
 **Team:** Pranay · Ariyan · Reman Dey  
 **Institution:** IIT Mandi  
-**Version:** 0.2.0 — Pre-Release  
+**Version:** 1.0.0-beta — Pre-Release  
 **Date:** June 2026
 
 ---
@@ -28,27 +28,30 @@ The existing BLE, Samsung Health, simulator, GATT parsing, and Android dashboard
 
 **Biometrics monitored** *(future)*
 - ECG waveform (AD8232) — deferred
-- Blood pressure — estimated via PPG — deferred
+- Blood pressure — estimated via PPG — **clinically invalid, removed from display**
 - Skin temperature (TMP117) — optional
 - Sweat / humidity (SHT40) — deferred
 
 **Elder safety**
-- Fall detection — IMU-based impact + posture change
-- SOS trigger — app and device-side emergency event
-- Inactivity monitoring — no movement for unusual duration
-- Caregiver alert state — Normal / Check / Warning / Emergency
+- Fall detection — IMU-based impact + posture change ✅
+- SOS trigger — app and device-side emergency event ✅
+- Inactivity monitoring — no movement for unusual duration ✅
+- Caregiver alert state — Normal / Check / Warning / Emergency ✅
 
 **Health alerts**
-- ECG anomaly detection: Normal / AFib / Tachycardia / Bradycardia
-- Dehydration risk: Low / Medium / High
-- Fall risk: Low / Medium / High
-- Abnormal vitals: Safe / Monitor / Alert
+- ECG anomaly detection: Normal / AFib / Tachycardia / Bradycardia ✅
+- Dehydration risk: Low / Medium / High ✅
+- Fall risk: Low / Medium / High ✅
+- Abnormal vitals: Safe / Monitor / Alert ✅
 
 **Platform**
-- Samsung Health integration — HR, SpO2, BP, Temp written to Health history
+- Samsung Health integration — HR, SpO2, Temp written to Health history (BP removed)
 - "Works With Samsung Health" BLE Accessory SDK compliance
-- Caregiver dashboard — live status, alert level, BLE readiness, and health trend
-- DPDPA consent flow — mandatory first-launch consent under India's Digital Personal Data Protection Act 2023
+- Caregiver dashboard — live status, alert level, BLE readiness, and health trend ✅
+- DPDPA consent flow — mandatory first-launch consent under India's Digital Personal Data Protection Act 2023 ✅
+- Foreground Service for 24/7 background BLE monitoring ✅
+- BLE auto-reconnect with exponential backoff ✅
+- Room database with SQLCipher encryption ✅
 
 ---
 
@@ -56,9 +59,9 @@ The existing BLE, Samsung Health, simulator, GATT parsing, and Android dashboard
 
 The first prototype is intentionally simple:
 
-- ESP32-C3 / nRF5340 BLE wearable.
+- ESP32-C3 BLE wearable (nRF5340 deferred to production).
 - MAX30102 for heart rate and SpO2.
-- MPU-6050 / ICM-42688 IMU for fall, inactivity, and posture state.
+- MPU-6050 IMU for fall, inactivity, and posture state.
 - Optional TMP117 for temperature.
 - Android app with simulator mode, BLE mode, caregiver alert flow, and Samsung Health path.
 - Normal rechargeable battery or USB power for showcase reliability.
@@ -140,11 +143,11 @@ eldercare-guardian-app/
 | Fall detection | ✅ Rules (FallDetectionEngine + FallConfirmationBuffer) |
 | Caregiver alert triage | ✅ Rules (CaregiverAlertPolicy) |
 | Inactivity monitoring | ✅ Rules (InactivityMonitor) |
-| ECG anomaly | ✅ Rules (EcgAnomalyDetector + HeartRateExtractor) |
+| ECG anomaly | ✅ Rules (EcgAnomalyDetector + HeartRateExtractor) — **fixed RMSSD logic** |
 | Dehydration risk | ✅ Rules (DehydrationRiskModel) |
 | Vitals risk | ✅ Rules (VitalsRiskMonitor) |
 | Overexertion | ✅ Rules (OverexertionModel) |
-| BP estimation | ⚠️ Linear model, flagged estimated |
+| BP estimation | ❌ **Removed from display — clinically invalid** |
 | TFLite models (1D-CNN, XGBoost, etc.) | ⏳ No model files exist — see `ml/README.md` |
 
 ### Samsung Health Integration *(path designed, not yet active)*
@@ -166,28 +169,25 @@ Generic Access (0x1800)
   Device Name = "ElderCare_v1"
 
 Battery Service (0x180F)
-  Battery Level [0–100%] ← supercap voltage derived
+  Battery Level [0–100%] ← LiPo voltage derived via ADC
 
 Heart Rate Service (0x180D)
   HR Measurement [0x2A37] ← MAX30102
 
 PLX / SpO2 Service (0x1822)
-  PLX Continuous Measurement [0x2A5F] ← MAX30102
-
-Blood Pressure Service (0x1810)
-  BP Measurement [0x2A35] ← PPG estimated
+  PLX Continuous Measurement [0x2A5F] ← MAX30102 (only when valid)
 
 Health Thermometer (0x1809)
-  Temperature Measurement [0x2A1C] ← TMP117
+  Temperature Measurement [0x2A1C] ← TMP117 (optional)
 
-Custom SmartSuit Service
-  ECG_RAW      float32[256]    raw ECG window
-  IMU_WRIST    float32[6]      ax,ay,az,gx,gy,gz
-  SOS_STATE    uint8           0/1
-  FALL_RISK    float32         0.0–1.0
-  HUMIDITY     float32[2]      %RH, temp_C
-  RESP_RATE    float32         breaths/min
-  DEVICE_STATE uint8           normal/check/urgent
+Custom ElderCare Service (12345678-1234-5678-1234-567812345678)
+  ECG_RAW       float32[256]    synthetic QRS-spike ECG window
+  IMU_WRIST     float32[6]      ax,ay,az,gx,gy,gz (m/s², °/s)
+  SOS_STATE     uint8           0=off 1=active
+  FALL_RISK     float32         0.0–1.0 (firmware: SOS-based, Android: IMU-based)
+  HUMIDITY      float32[2]      %RH, temp_C (synthetic)
+  RESP_RATE     float32         breaths/min (synthetic)
+  DEVICE_STATE  uint8           0=Normal 1=Check 2=Urgent
 ```
 
 ---
@@ -199,11 +199,13 @@ Custom SmartSuit Service
 | 0 | Samsung SDK registration + Android scaffold | 1 week | Pranay |
 | 1 | Wearable bench test — ESP32-C3 + MAX30102 + IMU | 1 week | Reman + Ariyan |
 | 2 | Sensor validation — HR/SpO2, IMU fall gesture, SOS button | 1–2 weeks | Ariyan |
-| 3 | BLE GATT firmware on nRF5340/ESP32-C3 | 2–3 weeks | Pranay + Ariyan |
+| 3 | BLE GATT firmware on ESP32-C3 | 2–3 weeks | Pranay + Ariyan |
 | 4 | Android app — BLE client + Samsung Health + dashboard | 2–3 weeks | Pranay |
 | 5 | Rule alerts first, ML model training later | 2–4 weeks | Pranay + team |
 | 6 | Wearable enclosure — wrist/clip prototype | 1–2 weeks | Ariyan |
 | 7 | Integration testing + showcase prep | 1–2 weeks | Full team |
+
+**Completed:** Phases 0-4 core functionality ✅ | **Showcase-ready** as of June 2026
 
 ---
 
