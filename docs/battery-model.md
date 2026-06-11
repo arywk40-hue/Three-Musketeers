@@ -121,9 +121,12 @@ your specific cell:
   short-duration backup; a separate ADC channel can read its voltage
   and populate `SensorFrame.supercapPercent` (currently a synthetic
   value driven by the simulator).
-- **Sleep-mode battery management** — when no BLE client is
+- ~~**Sleep-mode battery management** — when no BLE client is
   subscribed, the firmware can drop to deep-sleep between loop ticks
-  to extend runtime. Wake on the SOS button GPIO interrupt.
+  to extend runtime. Wake on the SOS button GPIO interrupt.~~
+  ✓ Done — Session 4 implements `esp_light_sleep_start()` (light sleep, not
+  deep sleep) with a 5 s timer wake-up when no client is connected,
+  and `delay(900)` with implicit modem sleep when a client is connected.
 - **OTA update of the discharge table** — once the cell ages, the
   curve drifts. A future revision can store the lookup table in NVS
   and let the app push an updated table over a custom characteristic.

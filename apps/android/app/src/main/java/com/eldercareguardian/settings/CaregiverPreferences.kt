@@ -51,6 +51,10 @@ class CaregiverPreferences private constructor(context: Context) {
         }
     }
 
+    suspend fun reset() {
+        store.edit { it.clear() }
+    }
+
     companion object {
         const val DEFAULT_NAME = "Caregiver"
         const val DEFAULT_PHONE = ""

@@ -24,32 +24,37 @@ Each track has independent timelines and can progress in parallel.
 ### Pre-requisites
 1. Rename package from `com.smartsuit` → `com.eldercareguardian` ✅ Done
 2. Set `applicationId = "com.eldercareguardian"` ✅ Done
-3. Create a Google Play Developer account (₹1,750 one-time fee)
-4. Set up release signing keystore (`keytool -genkey ...`)
-5. Configure `signingConfig` in `build.gradle.kts`
+3. Create a Google Play Developer account (₹1,750 one-time fee) — **not yet done**
+4. Set up release signing keystore (`keytool -genkey ...`) ✅ Done
+5. Configure `signingConfig` in `build.gradle.kts` (local keystore.properties + CI env vars) ✅ Done
 
 ### Build Checklist
 - [x] Enable R8 minification in `buildTypes.release`
 - [x] Create `proguard-rules.pro` with Room, SQLCipher, Gson rules
-- [ ] Set `versionCode` auto-increment in CI
-- [ ] Fill `AndroidManifest.xml` with `android:icon`, `android:roundIcon`
-- [ ] Create app icon (512×512 PNG + adaptive icon)
-- [ ] Write app description, screenshots for Play Store listing
+- [x] Set `versionCode` auto-increment in CI (`VERSION_CODE`/`VERSION_NAME` env vars)
+- [x] CI release job: base64 keystore decode → `bundleRelease` with env-based signing
+- [ ] Fill `AndroidManifest.xml` with `android:icon`, `android:roundIcon` — **not yet done**
+- [ ] Create app icon (512×512 PNG + adaptive icon) — **not yet done**
+- [ ] Write app description, screenshots for Play Store listing — docs/play-store-listing.md created, screenshots not captured
 - [x] Set `targetSdkVersion = 35` (required for new apps on Play)
 - [ ] Handle `SEND_SMS` permission — Play Store requires justification
 
 ### Play Store Policy Compliance
-- Remove any diagnostic claims ("diagnoses", "detects AFib") from app description
+- Remove any diagnostic claims ("diagnoses", "detects AFib") from app description — **not yet done**
 - Use wellness language: "wellness monitoring", "activity tracking", "caregiver alerts"
-- Add a privacy policy URL to the Play Store listing
-- Add a Data Safety section (health data stored locally, not shared)
+- [x] Privacy policy page created at `apps/privacy-policy/index.html` (Session 9)
+- [ ] Host privacy policy on GitHub Pages (`gh-pages` branch)
+- [ ] Add privacy policy URL to Play Store listing
+- [ ] Add a Data Safety section (health data stored locally, not shared)
 
 ### Timeline
 | Milestone | Duration |
 |---|---|
-| Package rename + signing setup | 1 day |
-| R8 rules + minification testing | 2 days |
-| Play Store listing creation | 1 day |
+| Package rename + signing setup | 1 day ✅ Done |
+| R8 rules + minification testing | 2 days ✅ Done |
+| CI release pipeline | 2 days ✅ Done (Session 8) |
+| Privacy policy page | 1 day ✅ Done (Session 9) |
+| Play Store listing creation (icon, screenshots, description) | 2 days |
 | Internal testing track (closed beta) | 1 week |
 | Production submission + review | 1–2 weeks |
 

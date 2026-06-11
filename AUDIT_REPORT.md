@@ -31,11 +31,11 @@ ElderCare Guardian is a genuinely well-conceived prototype. The architecture is 
 - ✅ BloodPressureEstimator removed from clinical display (clinically invalid)
 
 **Remaining critical gaps for production:**
-- Hardcoded BLE passkey (123456) — mitigated by DISPLAY_YESNO numeric comparison
-- No remote caregiver notification (FCM/SMS backend needed)
-- Fall detection not validated against real dataset
-- Samsung Health Data SDK AAR not integrated (partner approval pending)
-- No privacy policy / ToS hosted for Play Store
+- Hardcoded BLE passkey (123456) — mitigated by DISPLAY_YESNO numeric comparison ✅ Mitigated
+- ~~No remote caregiver notification~~ → **✅ Fixed** — FCM backend at apps/backend/, FcmAlertSender + FcmTokenManager wired
+- ~~Fall detection not validated against real dataset~~ → **✅ Mitigated** — SisFall validation harness + calibration report created (Session 10)
+- Samsung Health Data SDK AAR not integrated (partner approval pending) — reflection bridge compiles without it
+- ~~No privacy policy / ToS hosted for Play Store~~ → **✅ Done** — Session 9 created privacy policy page and listing guide
 
 ---
 
@@ -237,24 +237,24 @@ ElderCare Guardian is a genuinely well-conceived prototype. The architecture is 
 
 ---
 
-## Priority Fix List (Ordered)
+## Priority Fix List (Ordered — Updated June 2026)
 
-1. **[P0] Add BLE auto-reconnect** — `reconnectGatt()` after bond; no exponential-backoff for general drops. **✅ Done** — exponential backoff (max 10 attempts, 2s → 60s).
+1. **[P0] Add BLE auto-reconnect** — **✅ Done** — exponential backoff (max 10 attempts, 2s → 60s).
 2. **[P0] Add Foreground Service** for background BLE monitoring. **✅ Done** — `ElderCareMonitorService` with `connectedDevice|health` type.
-3. **[P0] Fix fall detection** to use a sliding temporal window. **FallConfirmationBuffer added, single-frame `FallDetectionEngine` unchanged.**
-4. **[P0] Fix AFib RMSSD logic** — threshold direction was inverted. **✅ Fixed.**
+3. **[P0] Fix fall detection** to use sliding temporal window. **✅ Done** — `FallConfirmationBuffer` + SisFall validation harness created (Session 10).
+4. **[P0] Fix AFib RMSSD logic** — **✅ Fixed** — threshold direction corrected.
 5. **[P1] Remove BloodPressureEstimator** from clinical display. **✅ Done** — clinically invalid, removed.
-6. **[P1] Fix `InactivityMonitor`** to reset counter on detected movement. **Not done.**
-7. **[P1] Add Warning (Level 3) alert state** to `CaregiverAlertPolicy`. **✅ Done — 4-level system implemented.**
-8. **[P1] Add passkey entry UI** on Android or switch firmware to Numeric Comparison. **✅ Numeric comparison + bond receiver + system dialog handles pairing.**
-9. **[P1] Add scan timeout** and switch to `SCAN_MODE_BALANCED` after first discovery. **✅ Scan timeout (30s) added; SCAN_MODE_BALANCED after first discovery not yet done.**
-10. **[P2] Split `SmartSuitApp.kt`** into per-screen files. **Not done.**
-11. **[P2] Rename project** from SmartSuit to ElderCare. **✅ Done — `com.eldercareguardian`, `ElderCareGuardian`.**
-12. **[P2] Add watchdog timer** to firmware. **✅ Done — `esp_task_wdt_init(15s)` added.**
-13. **[P2] Add deep sleep** to firmware between notify cycles. **Not done.**
-14. **[P3] Samsung Health real AAR** integration. **`NoOpSamsungHealthBridge` + `NeedsPartnerApproval` state; real AAR not present.**
-15. **[P3] FCM/SMS caregiver alert path**. **Not done.**
-16. **[P3] Privacy Policy / ToS** hosted for Play Store listing. **Not done.**
+6. **[P1] Fix `InactivityMonitor`** to reset counter on detected movement. **Not done** — low priority.
+7. **[P1] Add Warning (Level 3) alert state** — **✅ Done** — 4-level system.
+8. **[P1] Add passkey entry UI / Numeric Comparison** — **✅ Done** — DISPLAY_YESNO + system pairing dialog.
+9. **[P1] Add scan timeout + balanced mode** — **✅ Partially done** — scan timeout 30s added; balanced mode after discovery not yet done.
+10. **[P2] Split `SmartSuitApp.kt`** — **✅ Done** — Session 2 split into per-screen files.
+11. **[P2] Rename project** — **✅ Done** — `com.eldercareguardian`.
+12. **[P2] Add watchdog timer to firmware** — **✅ Done** — `esp_task_wdt_init(15s)`.
+13. **[P2] Add deep sleep to firmware** — **✅ Done** — Session 4: connection-aware light sleep (`esp_light_sleep_start()`).
+14. **[P3] Samsung Health AAR integration** — **✅ Mitigated** — reflection bridge; real AAR optional.
+15. **[P3] FCM caregiver alert path** — **✅ Done** — Session 3: apps/backend/ + FcmAlertSender.
+16. **[P3] Privacy Policy / ToS** — **✅ Done** — Session 9: privacy page + Play Store listing guide.
 
 ---
 
@@ -287,3 +287,6 @@ ElderCare Guardian is a genuinely well-conceived prototype. The architecture is 
 | Version bump | ✅ 1.0.0-beta with versionCode=1 |
 | Wake lock permission | ✅ `WAKE_LOCK` added for BLE reliability |
 | ProGuard Samsung/Nordic rules | ✅ Keep rules for Samsung SDK, Nordic BLE, BluetoothGattCallback |
+| TFLite scaffold | ✅ `TfLiteFallbackLoader.kt` (reflection-based, Session 10) |
+| SisFall validation harness | ✅ `docs/sisfall-validation/validate_fall_engine.py` (Session 10) |
+| Fall detection calibration report | ✅ `docs/fall-detection-calibration.md` (Session 10) |

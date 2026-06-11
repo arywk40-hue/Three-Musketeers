@@ -55,6 +55,24 @@ subscribes to every notify characteristic and the app dashboard starts
 showing live HR, ECG window, IMU magnitude, SOS state, humidity, and
 respiratory rate.
 
+### Power management
+
+On each loop tick the firmware picks the sleep mode based on whether a BLE
+client is connected:
+
+| Connection state | Sleep mechanism | Duration | Power saving |
+|---|---|---|---|
+| **Client connected** | `delay(900)` — FreeRTOS idle / modem sleep. NimBLE controller stays active, processing connection events in hardware. | 900 ms | ~20 mA → ~15 mA |
+| **No client** | `esp_light_sleep_start()` — CPU halted, BLE advertising resumes after wakeup. | 5 000 ms | ~20 mA → ~500 µA |
+
+When no client is connected the MCU spends most of its time in light sleep,
+reducing average current draw from ~20 mA to ~500 µA. The 5-second cadence is
+adequate for a wearable that is not actively monitored; the device remains
+discoverable because `startAdvertising()` is called in `onDisconnect()`.
+
+TX power is set to `ESP_PWR_LVL_P3` (~0 dBm) in `setup()` — wrist-to-phone
+range (~2 m) is sufficient, saving ~5 mA compared to `ESP_PWR_LVL_P9`.
+
 ---
 
 ## Firmware features

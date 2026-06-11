@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
+import java.security.KeyStoreException
 import java.security.SecureRandom
 
 object DatabaseEncryption {
@@ -26,22 +27,31 @@ object DatabaseEncryption {
         val existing = _supportFactory
         if (existing != null) return existing
 
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
+        val passphrase = try {
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
 
-        val prefs: SharedPreferences = EncryptedSharedPreferences.create(
-            context,
-            PREF_FILE,
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
+            val prefs: SharedPreferences = EncryptedSharedPreferences.create(
+                context,
+                PREF_FILE,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+            )
 
-        val passphrase = prefs.getString(KEY_PASSPHRASE, null) ?: run {
-            val newPass = generatePassphrase()
-            prefs.edit().putString(KEY_PASSPHRASE, newPass).apply()
-            newPass
+            prefs.getString(KEY_PASSPHRASE, null) ?: run {
+                val newPass = generatePassphrase()
+                prefs.edit().putString(KEY_PASSPHRASE, newPass).apply()
+                newPass
+            }
+        } catch (e: KeyStoreException) {
+            // Fallback for devices / test environments without AndroidKeyStore.
+            // Passphrase is generated fresh each time; database survives only
+            // for the current process lifetime.
+            generatePassphrase()
+        } catch (e: java.security.NoSuchAlgorithmException) {
+            generatePassphrase()
         }
 
         return SupportOpenHelperFactory(passphrase.toByteArray()).also { _supportFactory = it }

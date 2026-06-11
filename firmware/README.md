@@ -19,4 +19,4 @@ Current status (June 2026):
 - ✅ BLE security: bonding + MITM with numeric comparison (DISPLAY_YESNO)
 - ✅ Synthetic fallback for all sensors — BLE pipe stays alive without hardware
 - ✅ Software watchdog (esp_task_wdt) for I²C bus lockup protection
-- ✅ MTU negotiation to 517 bytes for ECG payload
+- ✅ MTU negotiation to 517 bytes (reserved — ECG payload deferred)

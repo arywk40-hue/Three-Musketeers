@@ -1,7 +1,11 @@
 package com.eldercareguardian.ui
 
 import android.app.Application
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.Location
+import android.Manifest
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.eldercareguardian.MainActivity
@@ -12,17 +16,28 @@ import com.eldercareguardian.ble.SmartSuitBleTelemetry
 import com.eldercareguardian.ble.SmartSuitSimulator
 import com.eldercareguardian.data.AlertEvent
 import com.eldercareguardian.data.CaregiverAlertStatus
+import com.eldercareguardian.data.DataDeleter
+import com.eldercareguardian.data.DataExporter
+import com.eldercareguardian.data.HealthSnapshot
+import com.eldercareguardian.data.Patient
 import com.eldercareguardian.data.SensorFrame
 import com.eldercareguardian.data.SensorFrameMerger
 import com.eldercareguardian.database.ElderCareDatabase
+import com.eldercareguardian.database.PatientEntity
 import com.eldercareguardian.database.toAlertEvent
 import com.eldercareguardian.database.toEntity
+import com.eldercareguardian.database.toHealthSnapshot
+import com.eldercareguardian.database.toPatient
 import com.eldercareguardian.ml.AlertHistoryTracker
+import com.eldercareguardian.notifications.CaregiverAlertDispatcher
+import com.eldercareguardian.notifications.FcmAlertSender
+import com.eldercareguardian.notifications.FcmTokenManager
 import com.eldercareguardian.notifications.NotificationHelper
-import com.eldercareguardian.samsung.NoOpSamsungHealthBridge
 import com.eldercareguardian.samsung.SamsungHealthBridge
+import com.eldercareguardian.samsung.SamsungHealthBridgeProvider
 import com.eldercareguardian.samsung.SamsungHealthState
 import com.eldercareguardian.service.ElderCareMonitorService
+import com.eldercareguardian.settings.ActivePatientPreferences
 import com.eldercareguardian.settings.CaregiverPreferences
 import com.eldercareguardian.settings.isValidPhone
 import kotlinx.coroutines.Dispatchers
@@ -41,10 +56,15 @@ import kotlinx.coroutines.withContext
 class SmartSuitViewModel(application: Application) : AndroidViewModel(application) {
     private val simulator = SmartSuitSimulator()
     private val bleDataSource = SmartSuitBleDataSource(application.applicationContext)
-    private val samsungBridge: SamsungHealthBridge = NoOpSamsungHealthBridge()
+    private val samsungBridge: SamsungHealthBridge = SamsungHealthBridgeProvider.create(application)
     private val db = ElderCareDatabase.getInstance(application.applicationContext)
+    private val patientDao = db.patientDao()
+    private val alertEventDao = db.alertEventDao()
+    private val healthDataDao = db.healthDataDao()
     private val alertHistoryTracker = AlertHistoryTracker()
     private val prefs = CaregiverPreferences.getInstance(application)
+    private val activePatientPrefs = ActivePatientPreferences.getInstance(application)
+    private val consentPrefs = com.eldercareguardian.consent.ConsentPreferences.getInstance(application)
 
     private val _sosOverride = MutableStateFlow(false)
     val sosOverride: StateFlow<Boolean> = _sosOverride.asStateFlow()
@@ -54,6 +74,38 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Back-compat alias for acknowledgedEmergency (renamed from acknowledgedUrgent). */
     val acknowledgedUrgent: StateFlow<Boolean> get() = _acknowledgedEmergency
+
+    private val _smsEnabled = MutableStateFlow(false)
+    val smsEnabled: StateFlow<Boolean> = _smsEnabled.asStateFlow()
+
+    fun setSmsEnabled(enabled: Boolean) {
+        _smsEnabled.value = enabled
+    }
+
+    private val _backendUrl = MutableStateFlow("")
+    val backendUrl: StateFlow<String> = _backendUrl.asStateFlow()
+
+    fun setBackendUrl(url: String) {
+        _backendUrl.value = url.trim()
+    }
+
+    // ── Multi-patient profile management ──
+    private val _patients = MutableStateFlow<List<Patient>>(emptyList())
+    val patients: StateFlow<List<Patient>> = _patients.asStateFlow()
+
+    private val _selectedPatientId = MutableStateFlow(ActivePatientPreferences.DEFAULT_PATIENT_ID)
+    val selectedPatientId: StateFlow<Long> = _selectedPatientId.asStateFlow()
+
+    val selectedPatient: StateFlow<Patient?> = combine(
+        _patients,
+        _selectedPatientId,
+    ) { patients, selectedId ->
+        patients.find { it.id == selectedId }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+        initialValue = null,
+    )
 
     private val _alertHistory = MutableStateFlow<List<AlertEvent>>(emptyList())
     val alertHistory: StateFlow<List<AlertEvent>> = _alertHistory.asStateFlow()
@@ -100,12 +152,30 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     )
 
     init {
-        // One-shot seed of in-memory history from persisted Room data on startup.
+        // Observe patients from Room
         viewModelScope.launch {
-            val persisted = withContext(Dispatchers.IO) {
-                db.alertEventDao().getRecent().first()
-            }.map { it.toAlertEvent() }
-            if (_alertHistory.value.isEmpty() && persisted.isNotEmpty()) {
+            patientDao.getAll().collect { entities ->
+                _patients.value = entities.map { it.toPatient() }
+            }
+        }
+
+        // Load persisted selected patient ID
+        viewModelScope.launch {
+            activePatientPrefs.activePatientId.collect { id ->
+                _selectedPatientId.value = id
+            }
+        }
+
+        // Load alert history for the selected patient on startup and on patient switch.
+        viewModelScope.launch {
+            _selectedPatientId.collect { patientId ->
+                val persisted = withContext(Dispatchers.IO) {
+                    if (patientId == ActivePatientPreferences.DEFAULT_PATIENT_ID) {
+                        alertEventDao.getRecent().first()
+                    } else {
+                        alertEventDao.getRecentForPatient(patientId).first()
+                    }
+                }.map { it.toAlertEvent() }
                 _alertHistory.value = persisted
             }
         }
@@ -121,14 +191,16 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
                     _alertHistory.value = alertHistoryTracker.prepend(_alertHistory.value, event)
                     when (event.level) {
                         CaregiverAlertStatus.Emergency -> {
+                            postEmergencyNotification(event)
+                            dispatchCaregiverAlert(event, CaregiverAlertStatus.Emergency, _smsEnabled.value)
+                            dispatchFcmAlert(event, CaregiverAlertStatus.Emergency)
                             _acknowledgedEmergency.value = false
-                            if (!_acknowledgedEmergency.value) {
-                                postEmergencyNotification(event)
-                            }
                         }
                         CaregiverAlertStatus.Warning -> {
                             NotificationHelper.cancelEmergency(getApplication())
                             postWarningNotification(event)
+                            dispatchCaregiverAlert(event, CaregiverAlertStatus.Warning, _smsEnabled.value)
+                            dispatchFcmAlert(event, CaregiverAlertStatus.Warning)
                         }
                         else -> {
                             // Check or Normal — cancel any outstanding emergency/warning notifications
@@ -136,10 +208,42 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
                             NotificationHelper.cancelWarning(getApplication())
                         }
                     }
+                    val patientId = _selectedPatientId.value
+                    val eventEntity = event.copy(patientId = patientId).toEntity()
                     viewModelScope.launch(Dispatchers.IO) {
-                        db.alertEventDao().insert(event.toEntity())
-                        db.alertEventDao().deleteOlderThan(System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000L)
+                        alertEventDao.insert(eventEntity)
+                        if (patientId == ActivePatientPreferences.DEFAULT_PATIENT_ID) {
+                            alertEventDao.deleteOlderThan(System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000L)
+                        } else {
+                            alertEventDao.deleteOlderThanForPatient(patientId, System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000L)
+                        }
                     }
+                }
+            }
+        }
+
+        // Health history recording — persist a snapshot every 60 s for the selected patient.
+        viewModelScope.launch {
+            while (true) {
+                delay(60_000L)
+                val frame = frames.value ?: continue
+                val patientId = _selectedPatientId.value
+                val snapshot = HealthSnapshot(
+                    patientId = patientId,
+                    timestampMillis = frame.timestampMillis,
+                    heartRateBpm = frame.heartRateBpm,
+                    spo2Percent = frame.spo2Percent,
+                    respiratoryRate = frame.respiratoryRate,
+                    skinTempC = frame.skinTempC,
+                    posture = frame.posture.name,
+                    fatigue = frame.fatigue.name,
+                    fallRisk = frame.fallRisk.name,
+                    caregiverAlert = frame.caregiverAlert.name,
+                    batteryPercent = frame.batteryPercent,
+                )
+                withContext(Dispatchers.IO) {
+                    healthDataDao.insert(snapshot.toEntity())
+                    healthDataDao.deleteOlderThanForPatient(patientId, System.currentTimeMillis() - 30 * 24 * 60 * 60 * 1000L) // 30-day retention
                 }
             }
         }
@@ -161,6 +265,7 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     val bleConnectionState: StateFlow<BleConnectionState> = bleDataSource.connectionState
     val discoveredDevices: StateFlow<List<DiscoveredBleDevice>> = bleDataSource.discoveredDevices
     val bleTelemetry: StateFlow<SmartSuitBleTelemetry> = bleDataSource.telemetry
+    val isLiveBleData: StateFlow<Boolean> = bleDataSource.isLiveData
     val samsungState: StateFlow<SamsungHealthState> = samsungBridge.state
 
     fun startBleScan() {
@@ -202,6 +307,61 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
         return true
     }
 
+    // ── Patient profile CRUD ──
+
+    fun selectPatient(patientId: Long) {
+        viewModelScope.launch {
+            activePatientPrefs.setActivePatientId(patientId)
+        }
+    }
+
+    suspend fun addPatient(name: String, caregiverName: String, caregiverPhone: String): Long {
+        val entity = PatientEntity(
+            name = name.trim(),
+            caregiverName = caregiverName.trim(),
+            caregiverPhone = caregiverPhone.trim(),
+        )
+        return withContext(Dispatchers.IO) {
+            patientDao.insert(entity)
+        }
+    }
+
+    suspend fun updatePatient(patient: Patient) {
+        withContext(Dispatchers.IO) {
+            patientDao.update(patient.toEntity())
+        }
+    }
+
+    suspend fun deletePatient(patient: Patient) {
+        withContext(Dispatchers.IO) {
+            patientDao.delete(patient.toEntity())
+            if (_selectedPatientId.value == patient.id) {
+                activePatientPrefs.setActivePatientId(ActivePatientPreferences.DEFAULT_PATIENT_ID)
+            }
+        }
+    }
+
+    // ── DPDPA Data export (suspend — call from UI coroutine scope) ──
+
+    suspend fun exportData(context: Context): Intent {
+        val patients = withContext(Dispatchers.IO) { patientDao.getAllOnce() }
+        val allHealth = withContext(Dispatchers.IO) { healthDataDao.getAll() }
+        val allAlerts = withContext(Dispatchers.IO) { alertEventDao.getAll() }
+        val file = withContext(Dispatchers.IO) {
+            DataExporter.exportJson(context, patients, allHealth, allAlerts)
+        }
+        return DataExporter.createShareIntent(context, file)
+    }
+
+    // ── DPDPA Right to erasure — wipe all local data ──
+
+    fun deleteAllData() {
+        val context = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) {
+            DataDeleter.deleteAllData(context, alertEventDao, healthDataDao, patientDao, consentPrefs)
+        }
+    }
+
     fun buildCaregiverDialIntent(): Intent? {
         val phone = caregiverPhoneNumber.value
         if (!isValidPhone(phone)) return null
@@ -222,6 +382,45 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         NotificationHelper.postWarningAlert(context, event, openApp)
+    }
+
+    private fun dispatchCaregiverAlert(event: AlertEvent, level: CaregiverAlertStatus, smsEnabled: Boolean) {
+        val context = getApplication<Application>()
+        val phone = caregiverPhoneNumber.value
+        val reason = event.reason.displayLabel
+        val hasPermission = context.checkSelfPermission(Manifest.permission.SEND_SMS) ==
+            PackageManager.PERMISSION_GRANTED
+        CaregiverAlertDispatcher.dispatch(
+            context = context,
+            level = level,
+            reason = reason,
+            caregiverPhone = phone,
+            enableSms = smsEnabled && hasPermission,
+        )
+    }
+
+    private fun dispatchFcmAlert(event: AlertEvent, level: CaregiverAlertStatus) {
+        val context = getApplication<Application>()
+        val url = _backendUrl.value
+        if (url.isBlank()) return
+        val patientName = selectedPatient.value?.name ?: caregiverDisplayName.value
+        viewModelScope.launch(Dispatchers.IO) {
+            val token = FcmTokenManager.getToken(context)
+            if (token == null) {
+                android.util.Log.w("SmartSuitViewModel", "No FCM token — skipping push")
+                return@launch
+            }
+            val result = FcmAlertSender.sendAlert(
+                backendUrl = url,
+                level = level,
+                reason = event.reason.displayLabel,
+                patientName = patientName,
+                caregiverFcmToken = token,
+            )
+            if (result.isFailure) {
+                android.util.Log.e("SmartSuitViewModel", "FCM alert failed: ${result.exceptionOrNull()?.message}")
+            }
+        }
     }
 
     override fun onCleared() {

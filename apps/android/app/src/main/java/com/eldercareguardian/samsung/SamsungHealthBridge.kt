@@ -1,5 +1,6 @@
 package com.eldercareguardian.samsung
 
+import android.content.Context
 import com.eldercareguardian.data.SensorFrame
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -9,11 +10,11 @@ import kotlinx.coroutines.flow.StateFlow
  *
  * The actual Samsung Health Data SDK v1.1.0 is distributed as a local AAR
  * (downloaded from developer.samsung.com/health/data). Until that AAR is
- * dropped into app/libs/, this interface is implemented by a NoOp that keeps
- * the bridge calls in the rest of the app non-blocking.
+ * dropped into app/libs/, this bridge uses [RealSamsungHealthBridge] which
+ * accesses the SDK via reflection so the module always compiles.
  *
- * When the AAR is present, swap [NoOpSamsungHealthBridge] for a real
- * implementation that calls the SDK — see the marked HOOK points below.
+ * If the AAR is absent, the bridge stays in [SamsungHealthState.NeedsSdkAar].
+ * If present, it attempts to connect and transitions to [Ready] on success.
  */
 interface SamsungHealthBridge {
     val state: StateFlow<SamsungHealthState>
@@ -45,15 +46,32 @@ enum class SamsungHealthState {
     Error,
 }
 
+/**
+ * Bridge provider — returns a [RealSamsungHealthBridge] when the AAR is
+ * detected at runtime, otherwise returns [NoOpSamsungHealthBridge].
+ */
+object SamsungHealthBridgeProvider {
+    fun create(context: Context): SamsungHealthBridge {
+        return try {
+            Class.forName("com.samsung.android.sdk.healthdata.HealthDataService")
+            RealSamsungHealthBridge(context)
+        } catch (_: ClassNotFoundException) {
+            NoOpSamsungHealthBridge()
+        }
+    }
+}
+
 class NoOpSamsungHealthBridge : SamsungHealthBridge {
-    private val _state = MutableStateFlow(SamsungHealthState.NeedsPartnerApproval)
+    private val _state = MutableStateFlow(SamsungHealthState.NeedsSdkAar)
     override val state: StateFlow<SamsungHealthState> = _state
 
     @Volatile
     var lastErrorMessage: String? = null
         private set
 
-    override suspend fun connect() = Unit
+    override suspend fun connect() {
+        _state.value = SamsungHealthState.NeedsSdkAar
+    }
 
     override suspend fun requestPermissions() = Unit
 

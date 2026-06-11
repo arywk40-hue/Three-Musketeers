@@ -1,11 +1,14 @@
 package com.eldercareguardian.ui.screens
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -15,17 +18,22 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -41,6 +50,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.eldercareguardian.data.Patient
 import com.eldercareguardian.settings.isValidPhone
 import com.eldercareguardian.settings.phoneDigitCount
 import kotlinx.coroutines.delay
@@ -61,9 +71,22 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     initialName: String,
     initialPhone: String,
+    smsEnabled: Boolean,
+    onSmsEnabledChanged: (Boolean) -> Unit,
+    backendUrl: String,
+    onBackendUrlChanged: (String) -> Unit,
     onSave: suspend (name: String, phone: String) -> Boolean,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    patients: List<Patient> = emptyList(),
+    selectedPatientId: Long = 0L,
+    selectedPatient: Patient? = null,
+    onSelectPatient: (Long) -> Unit = {},
+    onAddPatient: suspend (name: String, caregiverName: String, caregiverPhone: String) -> Long = { _, _, _ -> 0L },
+    onUpdatePatient: suspend (Patient) -> Unit = {},
+    onDeletePatient: suspend (Patient) -> Unit = {},
+    onExportData: suspend (Context) -> Intent = { Intent() },
+    onDeleteAllData: () -> Unit = {},
 ) {
     var name by remember { mutableStateOf(TextFieldValue(initialName)) }
     var phone by remember { mutableStateOf(TextFieldValue(initialPhone)) }
@@ -168,6 +191,50 @@ fun SettingsScreen(
                             }
                         },
                     )
+                    HorizontalDivider(color = Color(0xFFE2E8F0))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Send SMS on Warning/Emergency",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = "Requires SEND_SMS permission and a valid caregiver number",
+                                color = Color(0xFF64748B),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Switch(
+                            checked = smsEnabled,
+                            onCheckedChange = onSmsEnabledChanged,
+                        )
+                    }
+
+                    HorizontalDivider(color = Color(0xFFE2E8F0))
+                    Text(
+                        text = "Backend URL (FCM alerts)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    OutlinedTextField(
+                        value = backendUrl,
+                        onValueChange = onBackendUrlChanged,
+                        label = { Text("https://your-backend.railway.app") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    )
+                    Text(
+                        text = "FCM alerts use this endpoint to notify the caregiver's device.",
+                        color = Color(0xFF64748B),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+
                     if (errorText != null) {
                         Text(
                             text = errorText!!,
@@ -219,6 +286,21 @@ fun SettingsScreen(
                 }
             }
 
+            PatientSection(
+                patients = patients,
+                selectedPatientId = selectedPatientId,
+                selectedPatient = selectedPatient,
+                onSelectPatient = onSelectPatient,
+                onAddPatient = onAddPatient,
+                onUpdatePatient = onUpdatePatient,
+                onDeletePatient = onDeletePatient,
+            )
+
+            DataPrivacySection(
+                onExportData = onExportData,
+                onDeleteAllData = onDeleteAllData,
+            )
+
             Text(
                 text = "Caregiver contact is stored locally in app-private DataStore. " +
                     "It is not transmitted off the device.",
@@ -229,13 +311,320 @@ fun SettingsScreen(
     }
 }
 
+@Composable
+private fun PatientSection(
+    patients: List<Patient>,
+    selectedPatientId: Long,
+    selectedPatient: Patient?,
+    onSelectPatient: (Long) -> Unit,
+    onAddPatient: suspend (name: String, caregiverName: String, caregiverPhone: String) -> Long,
+    onUpdatePatient: suspend (Patient) -> Unit,
+    onDeletePatient: suspend (Patient) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var showAddDialog by remember { mutableStateOf(false) }
+    var patientToEdit by remember { mutableStateOf<Patient?>(null) }
+    var patientToDelete by remember { mutableStateOf<Patient?>(null) }
+
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Patient profiles",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            if (patients.isEmpty()) {
+                Text(
+                    text = "No patients yet. Add a patient profile to track their vitals and alerts.",
+                    color = Color(0xFF64748B),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                patients.forEach { patient ->
+                    val isSelected = patient.id == selectedPatientId
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = patient.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            )
+                            if (patient.caregiverName.isNotBlank()) {
+                                Text(
+                                    text = "Caregiver: ${patient.caregiverName}",
+                                    color = Color(0xFF64748B),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            OutlinedButton(
+                                onClick = { onSelectPatient(patient.id) },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.height(28.dp),
+                            ) {
+                                Text(
+                                    if (isSelected) "Active" else "Select",
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
+                            IconButton(onClick = { patientToEdit = patient }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Settings,
+                                    contentDescription = "Edit",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color(0xFF64748B),
+                                )
+                            }
+                            IconButton(onClick = { patientToDelete = patient }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Close,
+                                    contentDescription = "Delete",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color(0xFFB91C1C),
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = Color(0xFFE2E8F0))
+                }
+            }
+
+            Button(
+                onClick = { showAddDialog = true },
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Add patient")
+            }
+        }
+    }
+
+    if (showAddDialog) {
+        PatientFormDialog(
+            title = "Add patient",
+            initial = null,
+            onConfirm = { name, cgName, cgPhone ->
+                scope.launch {
+                    val id = onAddPatient(name, cgName, cgPhone)
+                    if (id > 0) onSelectPatient(id)
+                }
+                showAddDialog = false
+            },
+            onDismiss = { showAddDialog = false },
+        )
+    }
+
+    patientToEdit?.let { patient ->
+        PatientFormDialog(
+            title = "Edit patient",
+            initial = patient,
+            onConfirm = { name, cgName, cgPhone ->
+                scope.launch {
+                    onUpdatePatient(patient.copy(name = name, caregiverName = cgName, caregiverPhone = cgPhone))
+                }
+                patientToEdit = null
+            },
+            onDismiss = { patientToEdit = null },
+        )
+    }
+
+    patientToDelete?.let { patient ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { patientToDelete = null },
+            title = { Text("Delete ${patient.name}?") },
+            text = { Text("All vitals and alert history for this patient will be preserved in the database.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch { onDeletePatient(patient) }
+                        patientToDelete = null
+                    },
+                ) { Text("Delete", color = Color(0xFFB91C1C)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { patientToDelete = null }) { Text("Cancel") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun PatientFormDialog(
+    title: String,
+    initial: Patient?,
+    onConfirm: (name: String, caregiverName: String, caregiverPhone: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf(TextFieldValue(initial?.name ?: "")) }
+    var cgName by remember { mutableStateOf(TextFieldValue(initial?.caregiverName ?: "")) }
+    var cgPhone by remember { mutableStateOf(TextFieldValue(initial?.caregiverPhone ?: "")) }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Patient name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = cgName,
+                    onValueChange = { cgName = it },
+                    label = { Text("Caregiver name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = cgPhone,
+                    onValueChange = { cgPhone = it },
+                    label = { Text("Caregiver phone") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (name.text.isNotBlank()) {
+                        onConfirm(name.text.trim(), cgName.text.trim(), cgPhone.text.trim())
+                    }
+                },
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+@Composable
+private fun DataPrivacySection(
+    onExportData: suspend (Context) -> Intent,
+    onDeleteAllData: () -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Data & Privacy (DPDPA)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Under the Digital Personal Data Protection Act, 2023, you have the right " +
+                    "to access your data and the right to erasure.",
+                color = Color(0xFF64748B),
+                style = MaterialTheme.typography.bodySmall,
+            )
+
+            Button(
+                onClick = {
+                    scope.launch {
+                        val intent = onExportData(context)
+                        if (intent.resolveActivity(context.packageManager) != null) {
+                            context.startActivity(intent)
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Export all data (JSON)")
+            }
+
+            Button(
+                onClick = { showDeleteConfirm = true },
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB91C1C)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Delete all data")
+            }
+        }
+    }
+
+    if (showDeleteConfirm) {
+        ConfirmationDialog(
+            title = "Delete all data?",
+            message = "This will permanently delete all patients, health history, and alert " +
+                "records. Your DPDPA consent will be revoked and the app will restart to the " +
+                "consent screen. This cannot be undone.",
+            onConfirm = {
+                onDeleteAllData()
+                showDeleteConfirm = false
+            },
+            onDismiss = { showDeleteConfirm = false },
+        )
+    }
+}
+
+@Composable
+private fun ConfirmationDialog(
+    title: String,
+    message: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(message) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text("Delete", color = Color(0xFFB91C1C)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun SettingsScreenPreview() {
+    var smsEnabled by remember { mutableStateOf(false) }
+    var backendUrl by remember { mutableStateOf("") }
     MaterialTheme {
         SettingsScreen(
             initialName = "John Doe",
             initialPhone = "+1234567890",
+            smsEnabled = smsEnabled,
+            onSmsEnabledChanged = { smsEnabled = it },
+            backendUrl = backendUrl,
+            onBackendUrlChanged = { backendUrl = it },
             onSave = { _, _ -> true },
             onBack = {}
         )

@@ -57,20 +57,20 @@ After download, unzip and copy the `.aar` file into your project's `app/libs/` f
 apps/android/
 ├── app/
 │   ├── libs/
-│   │   ├── health-data-api-1.0.0.aar       ← Samsung Health Data SDK
-│   │   └── samsung-health-sensor-api.aar   ← Samsung Health Sensor SDK (if using Galaxy Watch)
+│   │   └── samsung-health-data-api-*.aar   ← Samsung Health Data SDK (optional, reflection bridge works without it)
 │   ├── src/main/
 │   │   ├── java/com/eldercareguardian/
 │   │   │   ├── ble/
+│   │   │   ├── consent/
 │   │   │   ├── samsung/
 │   │   │   ├── ml/
+│   │   │   ├── database/
+│   │   │   ├── notifications/
+│   │   │   ├── service/
+│   │   │   ├── data/
+│   │   │   ├── settings/
 │   │   │   └── ui/
-│   │   ├── assets/
-│   │   │   ├── ecg_anomaly.tflite
-│   │   │   ├── rep_counter.tflite
-│   │   │   ├── form_scorer.tflite
-│   │   │   ├── dehydration.tflite
-│   │   │   └── overexertion.tflite
+│   │   ├── assets/                          # Future .tflite model files go here
 │   │   └── res/
 │   └── build.gradle.kts
 ├── settings.gradle.kts
@@ -115,15 +115,38 @@ plugins {
 
 ---
 
-## app/build.gradle.kts (full)
+## app/build.gradle.kts (current — Session 10)
 
 ```kotlin
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-parcelize")          // ← REQUIRED by Samsung Health Data SDK
-    id("com.google.devtools.ksp")   // ← For Room database
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("kotlin-parcelize")
+    id("com.google.devtools.ksp")
 }
+
+import java.util.Properties
+
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val hasLocalKeystore = keystorePropertiesFile.exists()
+val ciStorePath = System.getenv("KEYSTORE_PATH")
+
+data class KsCfg(val storeFile: String, val storePassword: String, val keyAlias: String, val keyPassword: String)
+
+val signingCfg = when {
+    hasLocalKeystore -> {
+        val p = Properties().apply { load(keystorePropertiesFile.inputStream()) }
+        KsCfg(p.getProperty("storeFile",""), p.getProperty("storePassword",""), p.getProperty("keyAlias",""), p.getProperty("keyPassword",""))
+    }
+    ciStorePath != null && ciStorePath.isNotBlank() -> KsCfg(ciStorePath, System.getenv("KEYSTORE_PASSWORD") ?: "", System.getenv("KEY_ALIAS") ?: "", System.getenv("KEY_PASSWORD") ?: "")
+    else -> KsCfg("", "", "", "")
+}
+
+val hasSigningConfig = signingCfg.storeFile.isNotBlank() && signingCfg.storePassword.isNotBlank() && signingCfg.keyAlias.isNotBlank() && signingCfg.keyPassword.isNotBlank()
+
+val appVersionCode: Int = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
+val appVersionName: String = System.getenv("VERSION_NAME") ?: "1.0.0-beta"
 
 android {
     namespace = "com.eldercareguardian"
@@ -131,68 +154,34 @@ android {
 
     defaultConfig {
         applicationId = "com.eldercareguardian"
-        minSdk = 29                 // ← Samsung Health Data SDK minimum
+        minSdk = 29
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17   // ← Data SDK requires Java 17
-        targetCompatibility = JavaVersion.VERSION_17
+    signingConfigs { create("release").apply { if (hasSigningConfig) { storeFile = file(signingCfg.storeFile); storePassword = signingCfg.storePassword; keyAlias = signingCfg.keyAlias; keyPassword = signingCfg.keyPassword } } }
+
+    buildTypes {
+        release { isMinifyEnabled = true; isShrinkResources = true; proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"); if (hasSigningConfig) signingConfig = signingConfigs.getByName("release") }
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+    kotlinOptions { jvmTarget = "17" }
+    buildFeatures { compose = true }
 
-    buildFeatures {
-        compose = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.15"
-    }
-
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
-    }
+    packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
 }
 
 dependencies {
-
-    // ─────────────────────────────────────────────────────────
-    // SAMSUNG SDKs — local AAR files (downloaded from Samsung Developer Portal)
-    // ─────────────────────────────────────────────────────────
-
-    // Samsung Health Data SDK v1.1.0
-    // Download: https://developer.samsung.com/health/data/process.html
-    // File: health-data-api-1.0.0.aar → place in app/libs/
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("health-data-api-1.0.0.aar"))))
-
-    // Required by Samsung Health Data SDK
-    implementation("com.google.code.gson:gson:2.9.0")
-
-    // Samsung Health Sensor SDK v1.4.1 (only if targeting Galaxy Watch companion)
-    // Download: https://developer.samsung.com/health/sensor/process.html
-    // File: samsung-health-sensor-api.aar → place in app/libs/
-    // Uncomment if needed:
-    // implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("samsung-health-sensor-api.aar"))))
-
-    // ─────────────────────────────────────────────────────────
-    // ANDROID CORE
-    // ─────────────────────────────────────────────────────────
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
 
     implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.activity:activity-compose:1.9.1")
-
-    // ─────────────────────────────────────────────────────────
-    // JETPACK COMPOSE
-    // ─────────────────────────────────────────────────────────
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
 
     val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
     implementation(composeBom)
@@ -201,86 +190,33 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.navigation:navigation-compose:2.8.0")
-
-    debugImplementation("androidx.compose.ui:ui-tooling")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
-
-    // ─────────────────────────────────────────────────────────
-    // LIFECYCLE + VIEWMODEL
-    // ─────────────────────────────────────────────────────────
-
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.4")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
-
-    // ─────────────────────────────────────────────────────────
-    // COROUTINES
-    // ─────────────────────────────────────────────────────────
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-
-    // ─────────────────────────────────────────────────────────
-    // BLE (Bluetooth Low Energy)
-    // Android's built-in BluetoothManager is used directly — no extra dependency.
-    // However, Nordic's BLE library massively simplifies GATT client code:
-    // ─────────────────────────────────────────────────────────
-
-    implementation("no.nordicsemi.android:ble:2.8.1")
-    // Adds: BleManager base class, automatic bonding, MTU negotiation,
-    //       request queuing, connection state management — all the boilerplate gone.
-
-    // ─────────────────────────────────────────────────────────
-    // TENSORFLOW LITE — On-device ML inference
-    // ─────────────────────────────────────────────────────────
-
-    implementation("org.tensorflow:tensorflow-lite:2.15.0")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
-    implementation("org.tensorflow:tensorflow-lite-metadata:0.4.4")
-    // GPU delegate (optional — speeds up CNN models significantly):
-    implementation("org.tensorflow:tensorflow-lite-gpu:2.15.0")
-    implementation("org.tensorflow:tensorflow-lite-gpu-delegate-plugin:0.4.4")
-
-    // ─────────────────────────────────────────────────────────
-    // ROOM — Local database for sensor history
-    // ─────────────────────────────────────────────────────────
+    implementation("com.google.code.gson:gson:2.9.0")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // ─────────────────────────────────────────────────────────
-    // CHARTING — ECG waveform + vitals graphs
-    // ─────────────────────────────────────────────────────────
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 
-    // Vico — Compose-native charting (for line charts, HR graphs)
-    implementation("com.patrykandpatrick.vico:compose-m3:1.14.0")
-    implementation("com.patrykandpatrick.vico:core:1.14.0")
+    implementation("net.zetetic:sqlcipher-android:4.5.6")
+    implementation("androidx.sqlite:sqlite-ktx:2.4.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-    // MPAndroidChart — if you need the scrolling ECG waveform view (View-based)
-    // Requires jitpack repo in settings.gradle
-    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
-
-    // ─────────────────────────────────────────────────────────
-    // PERMISSIONS
-    // ─────────────────────────────────────────────────────────
-
-    // Accompanist — Compose permission handling (BLE, body sensors)
-    implementation("com.google.accompanist:accompanist-permissions:0.36.0")
-
-    // ─────────────────────────────────────────────────────────
-    // TESTING
-    // ─────────────────────────────────────────────────────────
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
 
     testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
-    androidTestImplementation(composeBom)
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("org.robolectric:robolectric:4.12.2")
+    testImplementation("androidx.test:core:1.6.1")
 }
 ```
+
+> **Note:** TFLite deps (`org.tensorflow:tensorflow-lite:2.15.0` + support/gpu) are NOT added — they are deferred until `.tflite` model files exist. The `TfLiteFallbackLoader` uses reflection like the Samsung bridge, so the app compiles without them. Add when model files land in `assets/`.
 
 ---
 
@@ -623,27 +559,30 @@ fun BlePermissionGate(content: @Composable () -> Unit) {
 
 ```
 # ElderCare Guardian — Dependency Versions (as of June 2026)
-Samsung Health Data SDK:    v1.1.0  (local AAR, from Samsung Developer Portal)
-Samsung Health Sensor SDK:  v1.4.1  (local AAR, Galaxy Watch only)
+Samsung Health Data SDK:    v1.1.0  (local AAR, optional — reflection bridge works without it)
 Samsung Health app minimum: 6.30.2
 Android minSdk:             29 (Android 10)
 Android targetSdk:          35 (Android 15)
 Kotlin:                     2.0.21
-Gradle:                     8.5.2
+Gradle:                     8.10.2
 Compose BOM:                2024.09.00
-Navigation Compose:         2.8.0
 Lifecycle:                  2.8.4
 Coroutines:                 1.8.1
-Nordic BLE:                 2.8.1
-TFLite:                     2.15.0
-TFLite Support:             0.4.4
-TFLite GPU:                 2.15.0
 Room:                       2.6.1
 KSP:                        2.0.21-1.0.27
-Vico charts:                1.14.0
-MPAndroidChart:             v3.1.0  (via JitPack)
-Accompanist Permissions:    0.36.0
-Gson:                       2.9.0   (required by Samsung Health Data SDK)
+Gson:                       2.9.0
+SQLCipher:                  4.5.6
+Firebase BOM:               33.1.0
+
+DEFERRED (add when .tflite model files exist):
+TFLite:                     2.15.0
+TFLite Support:             0.4.4
+TFLite Metadata:            0.4.4
+TFLite GPU:                 2.15.0
+
+NOT USED (removed from build.gradle.kts):
+Navigation Compose, Vico charts, MPAndroidChart, Accompanist Permissions,
+AppCompat, Material (compat), Kotlinx Coroutines Core (android variant used)
 
 DEPRECATED — DO NOT USE:
 Samsung Health SDK for Android  (deprecated July 31, 2025)

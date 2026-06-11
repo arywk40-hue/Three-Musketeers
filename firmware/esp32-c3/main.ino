@@ -21,6 +21,7 @@
 #include <NimBLE2902.h>
 #include <math.h>
 #include <esp_task_wdt.h>   // Phase 4: software watchdog
+#include <esp_sleep.h>      // Phase 9: light sleep power saving
 #include "MAX30105.h"
 #include "heartRate.h"
 #include "spo2_algorithm.h"
@@ -87,6 +88,11 @@ uint8_t g_battValue     = 88;
 uint8_t g_sosValue      = 0;
 uint8_t g_deviceState   = 0;
 uint32_t g_tickCounter  = 0;
+
+// Power management — see README.md for sleep-mode trade-offs.
+static bool     g_clientConnected    = false;
+static const uint64_t SLEEP_US_CONNECTED    = 900000ULL;    // 900 ms when client connected
+static const uint64_t SLEEP_US_DISCONNECTED = 5000000ULL;   // 5 s when no client
 
 // Watchdog timeout (seconds). If loop() does not kick the WDT within this
 // window, the MCU restarts. I²C lockup is the most common cause of silence.
@@ -204,10 +210,12 @@ static uint8_t readBatteryPercent() {
 class ServerCallbacks : public NimBLEServerCallbacks {
     void onConnect(NimBLEServer* server, ble_gap_conn_desc* desc) {
         Serial.printf("Client connected: %s\n", NimBLEAddress(desc->peer_ota_addr).toString().c_str());
+        g_clientConnected = true;
     }
 
     void onDisconnect(NimBLEServer* server, ble_gap_conn_desc* desc) {
         Serial.printf("Client disconnected: %s\n", NimBLEAddress(desc->peer_ota_addr).toString().c_str());
+        g_clientConnected = false;
         NimBLEDevice::startAdvertising();
     }
 };
@@ -588,5 +596,23 @@ void loop() {
     // Phase 4: Kick watchdog to prove the loop is not hung.
     esp_task_wdt_reset();
 
-    delay(1000);
+    // ── Connection-aware sleep ──
+    // Phase 9: Light sleep for battery life.
+    //   - Client connected:    delay(900) — CPU idle, BLE controller stays
+    //     active processing connection events. Total cycle ≈1 Hz
+    //     (900 ms sleep + ~100 ms processing). The delay() call lets the
+    //     FreeRTOS scheduler and the NimBLE controller handle radio events
+    //     in hardware; the CPU does NOT enter full light sleep but modem-
+    //     sleep mode is implicit.
+    //   - No client connected: esp_light_sleep_start() for 5 s, with a
+    //     timer wake-up. BLE advertising is re-started on disconnect so
+    //     the device remains discoverable, and the 5 s cadence is adequate
+    //     for a wearable that is not being actively monitored. Light sleep
+    //     cuts core power from ~20 mA to ~500 µA.
+    if (g_clientConnected) {
+        delay(SLEEP_US_CONNECTED / 1000ULL);
+    } else {
+        esp_sleep_enable_timer_wakeup(SLEEP_US_DISCONNECTED);
+        esp_light_sleep_start();
+    }
 }

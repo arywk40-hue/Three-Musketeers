@@ -1,4 +1,3 @@
-# Three-Musketeers
 # ElderCare Guardian
 > Elderly safety and health monitoring wearable — vitals, fall detection, SOS, and caregiver alerts.
 
@@ -26,11 +25,10 @@ The existing BLE, Samsung Health, simulator, GATT parsing, and Android dashboard
 - IMU 6-axis motion (MPU-6050) ✅
 - Battery voltage (ESP32-C3 ADC) ✅
 
-**Biometrics monitored** *(future)*
-- ECG waveform (AD8232) — deferred
-- Blood pressure — estimated via PPG — **clinically invalid, removed from display**
-- Skin temperature (TMP117) — optional
-- Sweat / humidity (SHT40) — deferred
+**Biometrics monitored** *(deferred)*
+- ECG waveform (AD8232)
+- Skin temperature (TMP117)
+- Sweat / humidity (SHT40)
 
 **Elder safety**
 - Fall detection — IMU-based impact + posture change ✅
@@ -55,18 +53,14 @@ The existing BLE, Samsung Health, simulator, GATT parsing, and Android dashboard
 
 ---
 
-## Revised Prototype
-
-The first prototype is intentionally simple:
+## Prototype
 
 - ESP32-C3 BLE wearable (nRF5340 deferred to production).
 - MAX30102 for heart rate and SpO2.
 - MPU-6050 IMU for fall, inactivity, and posture state.
 - Optional TMP117 for temperature.
 - Android app with simulator mode, BLE mode, caregiver alert flow, and Samsung Health path.
-- Normal rechargeable battery or USB power for showcase reliability.
-
-The earlier TEG, solar, piezo, and smart fabric work is deferred. It remains research inspiration, but it is not required for the elderly-care showcase.
+- Rechargeable battery or USB power for showcase reliability.
 
 ---
 
@@ -113,7 +107,8 @@ Dev workflow → see [`workflow.md`](./workflow.md)
 Elder care pivot → see [`docs/elder-care-pivot.md`](./docs/elder-care-pivot.md)  
 Product roadmap → see [`docs/product-roadmap.md`](./docs/product-roadmap.md)  
 One-month showcase plan → see [`docs/showcase-plan.md`](./docs/showcase-plan.md)  
-Android app scaffold → see [`apps/android`](./apps/android)
+Android app scaffold → see [`apps/android`](./apps/android)  
+Remaining work → see [`THINGS_LEFT.md`](./THINGS_LEFT.md)
 
 ---
 
@@ -122,41 +117,37 @@ Android app scaffold → see [`apps/android`](./apps/android)
 ### Android App — module structure
 
 ```
-eldercare-guardian-app/
-├── app/src/main/java/com/eldercareguardian/
-│   ├── ble/              # BLE scan, GATT client, frame parser
-│   ├── consent/          # DPDPA consent screen and DataStore
-│   ├── samsung/          # Samsung Health Data SDK wrapper
-│   ├── ml/               # Rule-based engines (ECG, IMU, vitals)
-│   ├── database/         # Room + SQLCipher encrypted persistence
-│   ├── notifications/    # Caregiver alert dispatcher
-│   ├── service/          # Foreground service for background monitoring
-│   └── ui/               # Jetpack Compose screens
-├── model/                # .tflite model files (deferred)
-└── build.gradle.kts
+app/src/main/java/com/eldercareguardian/
+├── ble/              # BLE scan, GATT client, frame parser
+├── consent/          # DPDPA consent screen and DataStore
+├── samsung/          # Samsung Health Data SDK wrapper
+├── ml/               # Rule-based engines (ECG, IMU, vitals) + TFLite scaffold
+├── database/         # Room + SQLCipher encrypted persistence
+├── notifications/    # Caregiver alert dispatcher + FCM
+├── service/          # Foreground service for background monitoring
+├── data/             # Domain models, exporter, deleter
+├── settings/         # DataStore preferences (patient, alert, consent)
+└── ui/               # Jetpack Compose screens + components
 ```
 
-### ML Models *(all rule-based for showcase; TFLite models deferred)*
+### ML Models *(rule-based; TFLite scaffold prepared in Session 10)*
 
 | Model | Status | Algorithm |
 |-------|--------|-----------|
-| Fall detection | ✅ Rules (FallDetectionEngine + FallConfirmationBuffer) |
-| Caregiver alert triage | ✅ Rules (CaregiverAlertPolicy) |
-| Inactivity monitoring | ✅ Rules (InactivityMonitor) |
-| ECG anomaly | ✅ Rules (EcgAnomalyDetector + HeartRateExtractor) — **fixed RMSSD logic** |
-| Dehydration risk | ✅ Rules (DehydrationRiskModel) |
-| Vitals risk | ✅ Rules (VitalsRiskMonitor) |
-| Overexertion | ✅ Rules (OverexertionModel) |
-| BP estimation | ❌ **Removed from display — clinically invalid** |
-| TFLite models (1D-CNN, XGBoost, etc.) | ⏳ No model files exist — see `ml/README.md` |
+| Fall detection | ✅ FallDetectionEngine + FallConfirmationBuffer | Temporal window |
+| Caregiver alert triage | ✅ CaregiverAlertPolicy | 4-level triage |
+| Inactivity monitoring | ✅ InactivityMonitor | Motion gate |
+| ECG anomaly | ✅ EcgAnomalyDetector + HeartRateExtractor | RMSSD + RR intervals |
+| Dehydration risk | ✅ DehydrationRiskModel | Tabular rules |
+| Vitals risk | ✅ VitalsRiskMonitor | Composite score |
+| Overexertion | ✅ OverexertionModel | HR reserve + SpO2 |
+| BP estimation | ❌ **Removed from display** | Clinically invalid |
+| TFLite models | ⏳ Scaffold exists (`TfLiteFallbackLoader`), no `.tflite` files yet | See `THINGS_LEFT.md` |
 
-### Samsung Health Integration *(path designed, not yet active)*
+### Samsung Health Integration *(reflection bridge active, AAR optional)*
 
-Designed for two Samsung Health SDKs, both requiring partner approval from Samsung:
-
-**Accessory SDK** — GATT spec compliance. Standard SIG services (HR 0x180D, PLX 0x1822) are auto-recognised. Custom services need app-side bridging.
-
-**Data SDK** — writes health readings into Samsung Health history. Local AAR not yet in `libs/`. Current state: `SamsungHealthState.NeedsPartnerApproval`.
+- **Data SDK:** `RealSamsungHealthBridge` uses reflection — always compiles. Transitions: `NeedsSdkAar` → `NeedsPartnerApproval` → `Ready`. No AAR required for build.
+- **Accessory SDK:** GATT profile uses standard SIG services (HR 0x180D, PLX 0x1822) for auto-recognition.
 
 Reference: https://developer.samsung.com/health
 
@@ -192,20 +183,20 @@ Custom ElderCare Service (12345678-1234-5678-1234-567812345678)
 
 ---
 
-## Build Phases
+## Implementation Sessions
 
-| Phase | What | Duration | Owner |
-|-------|------|----------|-------|
-| 0 | Samsung SDK registration + Android scaffold | 1 week | Pranay |
-| 1 | Wearable bench test — ESP32-C3 + MAX30102 + IMU | 1 week | Reman + Ariyan |
-| 2 | Sensor validation — HR/SpO2, IMU fall gesture, SOS button | 1–2 weeks | Ariyan |
-| 3 | BLE GATT firmware on ESP32-C3 | 2–3 weeks | Pranay + Ariyan |
-| 4 | Android app — BLE client + Samsung Health + dashboard | 2–3 weeks | Pranay |
-| 5 | Rule alerts first, ML model training later | 2–4 weeks | Pranay + team |
-| 6 | Wearable enclosure — wrist/clip prototype | 1–2 weeks | Ariyan |
-| 7 | Integration testing + showcase prep | 1–2 weeks | Full team |
-
-**Completed:** Phases 0-4 core functionality ✅ | **Showcase-ready** as of June 2026
+| Session | Scope | Status |
+|---------|-------|--------|
+| 1 | ViewModel race fix + SMS toggle | ✅ Done |
+| 2 | SmartSuitApp.kt structural refactor (split into screens) | ✅ Done |
+| 3 | FCM caregiver notification backend | ✅ Done |
+| 4 | Firmware deep sleep + BLE scan mode fix | ✅ Done |
+| 5 | Multi-patient profile system (Room + DataStore) | ✅ Done |
+| 6 | Health history + DPDPA export/delete | ✅ Done |
+| 7 | Samsung Health real AAR integration (reflection bridge) | ✅ Done |
+| 8 | Release pipeline + signing (CI env vars) | ✅ Done |
+| 9 | Privacy policy + Play Store listing | ✅ Done |
+| 10 | SisFall validation harness + TFLite scaffold | ✅ Done |
 
 ---
 

@@ -2,3 +2,10 @@
 apps/android/app/build/
 *.hprof
 *.apk
+
+# Firebase
+google-services.json
+
+# Node
+node_modules/
+

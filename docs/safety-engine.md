@@ -10,7 +10,7 @@ backends without touching the rest of the app.
 |-------------------------------|-----------------------------------------------|----------------|------------------------------------------------------------------------------------------------|
 | Model 1 — ECG Anomaly         | `ml/EcgAnomalyDetector.kt`                    | rule-based     | R-peak detect → RR intervals → RMSSD + rate. Output: `Normal / AFib / Tachycardia / Bradycardia` |
 | Model 1 helper — RR intervals | `ml/HeartRateExtractor.kt`                    | rule-based     | 256 Hz default, refractory 200 ms, threshold 0.55                                                |
-| Model 2 — Fall & Inactivity   | `ml/FallDetectionEngine.kt`                   | rule-based     | Wrist IMU magnitude. Spike > 24.5 m/s² or stillness < 3 m/s² → High / Medium risk               |
+| Model 2 — Fall & Inactivity   | `ml/FallDetectionEngine.kt`                   | rule-based     | Wrist IMU magnitude. Spike > 19.6 m/s² or stillness < 4.0 m/s² → High / Medium risk (Phase 5 temporal window). SisFall validation harness at `docs/sisfall-validation/`. TFLite scaffold at `ml/TfLiteFallbackLoader.kt`. |
 | Model 2 — Inactivity          | `ml/InactivityMonitor.kt`                     | rule-based     | Counts seconds since `|‖a‖ − 9.81| > 0.6 m/s²`                                                |
 | Model 3 — Dehydration         | `ml/DehydrationRiskModel.kt`                  | rule-based     | Sweat rate + skin temp + HR → Low / Medium / High                                               |
 | Model 4 — Overexertion        | `ml/OverexertionModel.kt`                     | rule-based     | HR-reserve % + SpO2 drop + RR + IMU intensity → Safe / Caution / Stop                            |
@@ -39,12 +39,19 @@ The rule-based engines are wrapped in `object` singletons with a single
 public function. To replace any one of them with a TFLite model:
 
 1. Add `org.tensorflow:tensorflow-lite:2.15.0` to `app/build.gradle.kts`
-   (currently absent — do NOT add until model files exist).
+   (currently absent — `TfLiteFallbackLoader` uses reflection so the app compiles without it).
 2. Drop the `.tflite` file into `app/src/main/assets/`.
-3. Create `ml/TfliteEcgAnomalyDetector.kt` (or similar) implementing the
-   same `assess(...)` signature as the rule version.
-4. Update the call site in `data/SensorFrameMerger.kt` to use the TFLite
-   class instead of the rule `object`.
+3. Wire `TfLiteFallbackLoaderProvider.create(context)` at the call site:
+   ```kotlin
+   val loader = TfLiteFallbackLoaderProvider.create(context)
+   loader.loadModel("fall_detection.tflite")
+   val result = loader.classify(floatArrayOf(ax, ay, az, gx, gy, gz))
+   if (result == null) {
+       // fall back to FallDetectionEngine
+   }
+   ```
+4. When `TFLite` dep is added later, `RealTfLiteFallbackLoader` starts working
+   automatically — no code changes needed.
 
 No changes are needed in `SensorFrame`, the ViewModel, the simulator, or
 the UI.

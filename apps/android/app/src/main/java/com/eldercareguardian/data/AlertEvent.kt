@@ -2,6 +2,7 @@ package com.eldercareguardian.data
 
 data class AlertEvent(
     val id: Long = System.currentTimeMillis(),
+    val patientId: Long = 0,
     val timestampMillis: Long = System.currentTimeMillis(),
     val level: CaregiverAlertStatus,
     val reason: AlertReason,

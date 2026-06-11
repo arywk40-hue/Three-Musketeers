@@ -64,6 +64,9 @@ class SmartSuitBleDataSource(
     private var reconnectAttempts = 0
     private val maxReconnectAttempts = 10
 
+    // Scan mode switching
+    private var hasSwitchedToBalanced = false
+
     // Scan timeout: stop scanning after 30 s if nothing connects
     private val scanTimeoutMs = 30_000L
     private val scanTimeoutRunnable = Runnable { stopScanOnly() }
@@ -76,6 +79,9 @@ class SmartSuitBleDataSource(
 
     private val _telemetry = MutableStateFlow(SmartSuitBleTelemetry())
     val telemetry: StateFlow<SmartSuitBleTelemetry> = _telemetry
+
+    private val _isLiveData = MutableStateFlow(false)
+    val isLiveData: StateFlow<Boolean> = _isLiveData
 
     override val frames: Flow<SensorFrame> = emptyFlow()
 
@@ -125,6 +131,12 @@ class SmartSuitBleDataSource(
                     _discoveredDevices.value = (_discoveredDevices.value
                         .filterNot { it.address == discovered.address } + discovered)
                         .sortedByDescending { it.rssi }
+
+                    // Switch to BALANCED mode after first discovery to save battery
+                    if (!hasSwitchedToBalanced) {
+                        hasSwitchedToBalanced = true
+                        switchToBalancedScanMode(scanner)
+                    }
                 }
 
                 override fun onScanFailed(errorCode: Int) {
@@ -137,6 +149,24 @@ class SmartSuitBleDataSource(
             // Auto-stop scan after 30 s
             mainHandler.removeCallbacks(scanTimeoutRunnable)
             mainHandler.postDelayed(scanTimeoutRunnable, scanTimeoutMs)
+        } catch (_: SecurityException) {
+            _connectionState.value = BleConnectionState.PermissionMissing
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun switchToBalancedScanMode(scanner: android.bluetooth.le.BluetoothLeScanner) {
+        val callback = scanCallback ?: return
+        try {
+            scanner.stopScan(callback)
+            val balancedSettings = ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
+                .build()
+            scanner.startScan(listOf(
+                ScanFilter.Builder()
+                    .setDeviceName(SmartSuitBleContract.DEVICE_NAME)
+                    .build()
+            ), balancedSettings, callback)
         } catch (_: SecurityException) {
             _connectionState.value = BleConnectionState.PermissionMissing
         }
@@ -171,6 +201,7 @@ class SmartSuitBleDataSource(
             pendingBond = false
             closeGatt()
             _connectionState.value = BleConnectionState.Idle
+            _isLiveData.value = false
         } catch (_: SecurityException) {
             _connectionState.value = BleConnectionState.PermissionMissing
         }
@@ -233,6 +264,7 @@ class SmartSuitBleDataSource(
     @SuppressLint("MissingPermission")
     private fun stopScanOnly() {
         mainHandler.removeCallbacks(scanTimeoutRunnable)
+        hasSwitchedToBalanced = false
         val callback = scanCallback ?: return
         try {
             bluetoothAdapter?.bluetoothLeScanner?.stopScan(callback)
@@ -330,6 +362,7 @@ class SmartSuitBleDataSource(
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     if (!pendingBond) {
                         _connectionState.value = BleConnectionState.Disconnected
+                        _isLiveData.value = false
                         closeGatt()
                         // Auto-reconnect if we have a target address
                         if (targetAddress != null) {
@@ -416,7 +449,11 @@ class SmartSuitBleDataSource(
 
     @SuppressLint("MissingPermission")
     private fun subscribeNext(gatt: BluetoothGatt) {
-        if (notificationIndex >= notificationQueue.size) return
+        if (notificationIndex >= notificationQueue.size) {
+            // All notifications subscribed — we're now receiving live data
+            _isLiveData.value = true
+            return
+        }
 
         val characteristic = notificationQueue[notificationIndex++]
         val cccd = characteristic.getDescriptor(SmartSuitBleContract.CLIENT_CHARACTERISTIC_CONFIG)

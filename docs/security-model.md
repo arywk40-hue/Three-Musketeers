@@ -112,8 +112,8 @@ Acceptable for the showcase because:
   shown with the number pre-filled and the user taps to place the call.
 
 Out-of-scope for Phase 1/2:
-- SMS/FCM push to remote caregivers (requires a backend, account, and
-  a privacy review of message content).
+- ~~SMS/FCM push to remote caregivers~~ → **✅ Done** — FCM backend at apps/backend/ (Session 3),
+  `FcmAlertSender` + `FcmTokenManager` wired into ViewModel. SMS path also active.
 
 ## Permissions
 

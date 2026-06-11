@@ -8,14 +8,41 @@ plugins {
 
 import java.util.Properties
 
+// ── Signing: local keystore.properties file or CI env vars ──
+// CI workflow decodes KEYSTORE_BASE64 into a file and passes the path.
 val keystorePropertiesFile = rootProject.file("keystore.properties")
-val hasKeystore = keystorePropertiesFile.exists()
-val props = Properties()
-if (hasKeystore) { props.load(keystorePropertiesFile.inputStream()) }
-val ksStoreFile = props.getProperty("storeFile") ?: ""
-val ksStorePassword = props.getProperty("storePassword") ?: ""
-val ksKeyAlias = props.getProperty("keyAlias") ?: ""
-val ksKeyPassword = props.getProperty("keyPassword") ?: ""
+val hasLocalKeystore = keystorePropertiesFile.exists()
+val ciStorePath = System.getenv("KEYSTORE_PATH")
+
+data class KsCfg(val storeFile: String, val storePassword: String, val keyAlias: String, val keyPassword: String)
+
+val signingCfg = when {
+    hasLocalKeystore -> {
+        val p = Properties().apply { load(keystorePropertiesFile.inputStream()) }
+        KsCfg(
+            p.getProperty("storeFile", ""),
+            p.getProperty("storePassword", ""),
+            p.getProperty("keyAlias", ""),
+            p.getProperty("keyPassword", ""),
+        )
+    }
+    ciStorePath != null && ciStorePath.isNotBlank() -> KsCfg(
+        ciStorePath,
+        System.getenv("KEYSTORE_PASSWORD") ?: "",
+        System.getenv("KEY_ALIAS") ?: "",
+        System.getenv("KEY_PASSWORD") ?: "",
+    )
+    else -> KsCfg("", "", "", "")
+}
+
+val hasSigningConfig = signingCfg.storeFile.isNotBlank() &&
+    signingCfg.storePassword.isNotBlank() &&
+    signingCfg.keyAlias.isNotBlank() &&
+    signingCfg.keyPassword.isNotBlank()
+
+// ── Version from CI env or fallback ──
+val appVersionCode: Int = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
+val appVersionName: String = System.getenv("VERSION_NAME") ?: "1.0.0-beta"
 
 android {
     namespace = "com.eldercareguardian"
@@ -25,27 +52,30 @@ android {
         applicationId = "com.eldercareguardian"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0-beta"
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
-    if (hasKeystore) {
-        signingConfigs {
-            create("release") {
-                storeFile = file(ksStoreFile)
-                storePassword = ksStorePassword
-                keyAlias = ksKeyAlias
-                keyPassword = ksKeyPassword
+    signingConfigs {
+        create("release").apply {
+            if (hasSigningConfig) {
+                storeFile = file(signingCfg.storeFile)
+                storePassword = signingCfg.storePassword
+                keyAlias = signingCfg.keyAlias
+                keyPassword = signingCfg.keyPassword
             }
         }
-        buildTypes {
-            release {
-                isMinifyEnabled = true
-                isShrinkResources = true
-                proguardFiles(
-                    getDefaultProguardFile("proguard-android-optimize.txt"),
-                    "proguard-rules.pro"
-                )
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            if (hasSigningConfig) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
@@ -103,6 +133,9 @@ dependencies {
     implementation("net.zetetic:sqlcipher-android:4.5.6")
     implementation("androidx.sqlite:sqlite-ktx:2.4.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
