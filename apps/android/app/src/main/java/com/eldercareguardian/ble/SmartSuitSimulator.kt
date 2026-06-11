@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.flow
 
 class SmartSuitSimulator : SmartSuitDataSource {
     private val fallBuffer = FallConfirmationBuffer()
+    private val fallDetectionEngine = FallDetectionEngine()
 
     override val frames: Flow<SensorFrame> = flow {
         var tick = 0
@@ -63,7 +64,7 @@ class SmartSuitSimulator : SmartSuitDataSource {
             } else {
                 listOf(ax, ay, az, gx, gy, gz)
             }
-            val fall = FallDetectionEngine.assess(simulatedWristImu)
+            val fall = fallDetectionEngine.assess(simulatedWristImu)
             val sosActive = tick % 53 in 49..52
             val confirmedFallRisk = fallBuffer.assess(fall, sosActive)
             inactivitySeconds = InactivityMonitor.assess(imuMagnitude, inactivitySeconds)

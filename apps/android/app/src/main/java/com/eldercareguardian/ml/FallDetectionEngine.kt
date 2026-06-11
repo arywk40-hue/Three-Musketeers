@@ -32,7 +32,7 @@ import kotlin.math.sqrt
  * literature (e.g., Bourke & Lyons 2008 — threshold 2g for wrist/waist). They
  * MUST be validated against a labelled dataset before clinical deployment.
  */
-object FallDetectionEngine {
+class FallDetectionEngine {
 
     // ── Threshold constants ──────────────────────────────────────────────────
 

@@ -20,6 +20,11 @@ object SmartSuitPermissions {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             add(Manifest.permission.ACTIVITY_RECOGNITION)
         }
+
+        // Background location (API 29+) — required for BLE scanning in background
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
     }
 
     fun missingPermissions(context: Context): List<String> {
@@ -32,6 +37,7 @@ object SmartSuitPermissions {
         Manifest.permission.BLUETOOTH_SCAN -> "Nearby device scan"
         Manifest.permission.BLUETOOTH_CONNECT -> "Nearby device connect"
         Manifest.permission.ACCESS_FINE_LOCATION -> "Location for BLE scan"
+        Manifest.permission.ACCESS_BACKGROUND_LOCATION -> "Background location"
         Manifest.permission.BODY_SENSORS -> "Body sensors"
         Manifest.permission.ACTIVITY_RECOGNITION -> "Activity recognition"
         else -> permission.substringAfterLast(".")

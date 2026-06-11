@@ -172,6 +172,36 @@ Review fixes:
 - Supercap progress bar fills available card width.
 - Samsung Health workflow/dependency docs now use the local AAR Data SDK path instead of the deprecated Maven/old Android SDK examples.
 
+---
+
+## Post-Session 10 — CI fix + docs cleanup + next-sessions plan
+
+Fixed CI bug: `release` job `if:` condition referenced `secrets.KEYSTORE_BASE64 != ''`,
+which GitHub Actions does not support (secrets in `if:` always evaluate to empty).
+Removed the comparison — the job now only gates on `github.ref == 'refs/heads/main'`.
+
+Docs cleanup across 8 `.md` files:
+- `README.md`: removed duplicate title, TEG/solar/piezo references, old build phases 0–7; replaced with 10-session table; updated module/ML descriptions.
+- `dependencies.md`: replaced full `build.gradle.kts` snippet with actual current file; removed Accompanist, Vico, MPAndroidChart, Navigation Compose references; TFLite noted as deferred.
+- `AUDIT_REPORT.md`: updated remaining critical gaps (FCM, fall detection, privacy now done), 16-item priority fix list marked up, Session 10 items added.
+- `LAUNCH_BLOCKERS.md`: B10 (data export/delete) marked partially fixed; P1 count 3→2; Session 10 items added.
+- `docs/safety-engine.md`: fixed old thresholds (24.5→19.6, 3.0→4.0); TFLite section references TfLiteFallbackLoaderProvider.
+- `DEPLOYMENT_PLAN.md`: signing, CI, privacy page items marked done.
+- `docs/security-model.md`: FCM/SMS reference updated from out-of-scope to done.
+- `firmware/README.md`: ECG MTU note marked deferred.
+
+Created `THINGS_LEFT.md` with next 10 sessions roadmap (11–20) organised by blocker:
+- 11: CI fix + data-source indicator
+- 12: Medical claims language sweep (B07)
+- 13: Configurable data retention (B10)
+- 14: Terms of Service page + GitHub Pages deploy (B11)
+- 15: SpO2 quality indicator (B16)
+- 16: InactivityMonitor thread-safety fix
+- 17: FallDetectionEngine singleton→instance
+- 18: ACCESS_BACKGROUND_LOCATION permission
+- 19: App icon + Play Store graphics
+- 20: SisFall dataset threshold validation
+
 Product pivot:
 - Revised direction from fitness smart suit to elderly safety and health wearable.
 - Prototype scope changes to wrist/clip device with vitals, fall/SOS, inactivity, and caregiver alerts.

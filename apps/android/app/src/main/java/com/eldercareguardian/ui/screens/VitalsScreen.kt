@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.eldercareguardian.data.EcgAnomalyStatus
 import com.eldercareguardian.data.SensorFrame
+import com.eldercareguardian.data.Spo2Quality
 import com.eldercareguardian.ui.components.MetricCard
 import com.eldercareguardian.ui.components.PillStatus
 import com.eldercareguardian.ui.components.SectionTitle
@@ -111,6 +112,28 @@ private fun EcgPanel(samples: List<Float>) {
 }
 
 @Composable
+private fun SpO2QualityChip(quality: Spo2Quality) {
+    val (color, text) = when (quality) {
+        Spo2Quality.Reliable -> Color(0xFF0F766E) to "Signal reliable"
+        Spo2Quality.Unreliable -> Color(0xFFB45309) to "Signal unreliable"
+        Spo2Quality.NoSignal -> Color(0xFFB91C1C) to "No signal"
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text = text,
+            color = color,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
 private fun EcgAnomalyCard(status: EcgAnomalyStatus) {
     Card(
         shape = RoundedCornerShape(8.dp),
@@ -129,7 +152,7 @@ private fun EcgAnomalyCard(status: EcgAnomalyStatus) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SectionTitle("ECG rhythm")
-                StatusPill(label = status.name, status = PillStatus.Risk(rhythmSeverity(status)))
+                StatusPill(label = status.displayLabel, status = PillStatus.Risk(rhythmSeverity(status)))
             }
             Text(
                 text = rhythmDescription(status),
@@ -147,6 +170,7 @@ private fun MetricGrid(frame: SensorFrame) {
             MetricCard("HR", "${frame.heartRateBpm}", "bpm", Modifier.weight(1f))
             MetricCard("SpO2", "%.1f".format(frame.spo2Percent), "%", Modifier.weight(1f))
         }
+        SpO2QualityChip(frame.spo2Quality)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             MetricCard(
                 label = "BP",

@@ -211,6 +211,14 @@ private fun BleConnectionPanel(
                 color = Color(0xFF64748B),
                 style = MaterialTheme.typography.bodySmall,
             )
+            if (missingPermissions.any { it == "android.permission.ACCESS_BACKGROUND_LOCATION" }) {
+                Text(
+                    text = "Background location is required for BLE scanning when the app is in the background. " +
+                        "Grant it via Settings \u2192 Permissions if BLE disconnects when you leave the app.",
+                    color = Color(0xFFB45309),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(

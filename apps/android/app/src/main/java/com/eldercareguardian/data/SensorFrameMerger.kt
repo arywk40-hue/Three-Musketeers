@@ -14,6 +14,8 @@ import kotlin.math.sqrt
 
 object SensorFrameMerger {
     private val fallBuffer = FallConfirmationBuffer()
+    private val fallDetectionEngine = FallDetectionEngine()
+    private var inactivitySeconds = 0
 
     fun merge(base: SensorFrame, ble: SmartSuitBleTelemetry): SensorFrame {
         val hasBle = ble.heartRateBpm != null
@@ -26,7 +28,7 @@ object SensorFrameMerger {
         val ecgSamples = ble.ecgSamples.takeIf { it.size == 256 } ?: base.ecgSamples
 
         val fall = if (ble.wristImu.size >= 6) {
-            FallDetectionEngine.assess(ble.wristImu)
+            fallDetectionEngine.assess(ble.wristImu)
         } else {
             null
         }
@@ -37,6 +39,8 @@ object SensorFrameMerger {
         } else {
             base.imuMagnitude
         }
+        val isFallActive = fall?.riskStatus == RiskStatus.High || fall?.riskStatus == RiskStatus.Medium
+        inactivitySeconds = InactivityMonitor.assess(imuMagnitude, inactivitySeconds, isFallActive)
 
         val heartRateFromEcg = if (ecgSamples.size == 256) {
             HeartRateExtractor.extractRrIntervals(ecgSamples)
@@ -75,6 +79,7 @@ object SensorFrameMerger {
             respiratoryRate = respiratoryRate,
             ecgSamples = ecgSamples,
             sosActive = ble.sosState,
+            inactivityMinutes = InactivityMonitor.toMinutes(inactivitySeconds),
             fallRisk = confirmedFallRisk ?: base.fallRisk,
             posture = posture,
             fatigue = overexertion.status,

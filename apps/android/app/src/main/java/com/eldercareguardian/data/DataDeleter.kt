@@ -7,6 +7,7 @@ import com.eldercareguardian.database.HealthDataDao
 import com.eldercareguardian.database.PatientDao
 import com.eldercareguardian.settings.ActivePatientPreferences
 import com.eldercareguardian.settings.CaregiverPreferences
+import com.eldercareguardian.settings.DataRetentionPreferences
 
 object DataDeleter {
 
@@ -23,6 +24,7 @@ object DataDeleter {
 
         CaregiverPreferences.getInstance(context).reset()
         ActivePatientPreferences.getInstance(context).reset()
+        DataRetentionPreferences.getInstance(context).reset()
         consentPreferences.revokeConsent()
     }
 }

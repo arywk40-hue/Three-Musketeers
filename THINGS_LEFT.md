@@ -1,31 +1,38 @@
 # Things Left to Implement
 
-> **Generated:** June 2026 — after all 10 implementation sessions completed.
+> **Generated:** June 2026 — after Sessions 1–20 complete.
 
 ---
 
-## P0 — All Resolved ✅
+## All Sessions 11–20 Implemented ✅
 
-All 6 P0 blockers fixed or mitigated across Sessions 1–10. Nothing blocks responsible pilot deployment.
+| Session | Scope | Status |
+|---------|-------|--------|
+| **11** | Fix CI `if:` condition (already clean); DataSourceChip in dashboard | ✅ Complete |
+| **12** | Medical claims language sweep: `displayLabel` on `EcgAnomalyStatus`, non-diagnostic UI strings | ✅ Complete |
+| **13** | `DataRetentionPreferences` (7/14/30/60/90 days), settings picker, ViewModel wired | ✅ Complete |
+| **14** | Terms of Service page (`apps/tos/index.html`), GitHub Pages deploy workflow | ✅ Complete |
+| **15** | `Spo2Quality` enum, 3-reading debounce in `CaregiverAlertPolicy`, quality chip on VitalsScreen | ✅ Complete |
+| **16** | `InactivityMonitor` accumulator in `SensorFrameMerger`, `isFallActive` wired | ✅ Complete |
+| **17** | `FallDetectionEngine` converted from `object` to `class`, all call sites + tests updated | ✅ Complete |
+| **18** | `ACCESS_BACKGROUND_LOCATION` in manifest + permissions + rationale in ReadinessScreen | ✅ Complete |
+| **19** | Adaptive app icon (teal + heart-pulse), mipmap-anydpi-v26, manifest `android:icon` | ✅ Complete |
+| **20** | SisFall validation script ready; block on dataset download | ⏳ Blocked (no dataset) |
 
 ---
 
-## P1 — Pre-Commercial (3 items)
+## P1 — Pre-Commercial (0 items remaining)
+All B07, B10, B11 items resolved across Sessions 12–14.
+
+---
+
+## P2 — Pre-Pilot (1 item remaining)
 
 | Blocker | Description | Effort |
 |---------|-------------|--------|
-| **B07 — Medical claims language** | Replace diagnostic language ("AFib", "Bradycardia") with wellness indicators ("irregular rhythm detected — consult a doctor") throughout UI | 2–3 days |
-| **B10 — Data retention policy UI** | Allow user to configure retention period (currently hardcoded 7-day Room purge). Export/delete (Session 6) works, but configurable retention is missing | 2–3 days |
-| **B11 — Terms of Service page** | Write ToS, host alongside privacy policy on GitHub Pages, link from app and Play Store listing | 1–2 days |
+| **B14 — Single point of failure** | Redundancy: secondary SMS alert, device-removal detection, multi-device pairing | 1–2 weeks |
 
----
-
-## P2 — Pre-Pilot (2 items)
-
-| Blocker | Description | Effort |
-|---------|-------------|--------|
-| **B14 — Single point of failure** | One phone, one BLE connection, one wearable. Add redundancy: secondary SMS alert path verified, device-removal detection, multi-device pairing | 1–2 weeks |
-| **B16 — SpO2 quality indicator** | Display signal quality indicator alongside SpO2. Require 3 consecutive low readings before alerting | 3–5 days |
+> **B16** resolved in Session 15.
 
 ---
 
@@ -33,42 +40,42 @@ All 6 P0 blockers fixed or mitigated across Sessions 1–10. Nothing blocks resp
 
 | Blocker | Description | Effort |
 |---------|-------------|--------|
-| **B17 — Differentiation story** | Sharpen pitch vs Apple Watch / Galaxy Watch. Focus on caregiver dashboard + non-Samsung alert path | Ongoing (marketing) |
-| **B18 — Competitor moats** | Identify niche: ₹500 clip-on price point, landline/feature phone integration, B2B care home sales | Ongoing (strategy) |
-| **B19 — PCB manufacturing** | Move from ESP32-C3 dev board to custom PCB with SMD sensors. Requires PCB design, PCBA vendor, enclosure, regulatory testing | ₹20–50L, 6–12 mo |
+| **B17 — Differentiation story** | Sharpen pitch vs Apple Watch / Galaxy Watch | Ongoing (marketing) |
+| **B18 — Competitor moats** | Identify niche: ₹500 clip-on, landline integration, B2B care homes | Ongoing (strategy) |
+| **B19 — PCB manufacturing** | Custom PCB with SMD sensors, enclosure, regulatory testing | ₹20–50L, 6–12 mo |
 
 ---
 
-## SisFall Dataset Validation
+## SisFall Dataset Validation (Session 20)
 
-| Task | Description | Effort |
-|------|-------------|--------|
-| Download SisFall dataset | Request research access from authors | 1 day (wait) |
-| Run validation script | `python3 docs/sisfall-validation/validate_fall_engine.py --data-dir <path>` | 1 hour |
-| Update thresholds | Paste optimal values into `FallDetectionEngine.kt` | 10 min |
-| Re-run tests | `./gradlew testDebugUnitTest` to confirm | 2 min |
+| Task | Description |
+|------|-------------|
+| Download SisFall dataset | Request research access from authors |
+| Run validation script | `python3 docs/sisfall-validation/validate_fall_engine.py --data-dir <path>` |
+| Update thresholds | Paste optimal values into `FallDetectionEngine.kt` |
+| Re-run tests | `./gradlew testDebugUnitTest` to confirm |
 
 ---
 
-## Samsung Health Path
+## Samsung Health Path (no session planned — partner-dependent)
 
-| Task | Description | Effort |
-|------|-------------|--------|
-| Download Data SDK AAR | From Samsung Developer Portal → `app/libs/` | 30 min |
-| Apply to Partner App Program | Register `com.eldercareguardian` for write access | 4–8 weeks wait |
-| Test on physical Samsung device | Replace `RealSamsungHealthBridge` full integration | 1–2 days |
-| Accessory SDK certification | Submit GATT profile for "Works With Samsung Health" | 4–8 weeks |
+| Task | Description |
+|------|-------------|
+| Download Data SDK AAR | From Samsung Developer Portal → `app/libs/` |
+| Apply to Partner App Program | Register `com.eldercareguardian` for write access (4–8 weeks) |
+| Test on physical Samsung device | Full `RealSamsungHealthBridge` integration |
+| Accessory SDK certification | Submit GATT profile for "Works With Samsung Health" |
 
 ---
 
 ## CI / Release
 
-| Task | Description | Effort |
-|------|-------------|--------|
-| Enable CI release job | Uncomment release job in `.github/workflows/android-ci.yml`, set secrets | 1 day |
-| Set VERSION_CODE auto-increment | Use `github.run_number` (already configured) | Done |
-| Create Play Store listing | App icon, screenshots, description, Data Safety section | 2 days |
-| Close beta → production rollout | Staged 10% rollout | 48h monitoring |
+| Task | Session | Status |
+|------|---------|--------|
+| Fix CI `if:` condition | 11 | ✅ Clean (no secrets in `if:`) |
+| App icon + feature graphic | 19 | ✅ Adaptive icon created |
+| Play Store listing | 19 | ⏳ Screenshots, description, Data Safety section |
+| Close beta → production rollout | After 19 | ⏳ Staged 10% rollout |
 
 ---
 
@@ -83,10 +90,10 @@ All 6 P0 blockers fixed or mitigated across Sessions 1–10. Nothing blocks resp
 
 ---
 
-## Cleanup / Tech Debt
+## Cleanup / Tech Debt (Done ✅)
 
-| Task | Description | Effort |
-|------|-------------|--------|
-| Remove `hardware/embedded/` legacy firmware | Deprecated Bluetooth Classic Serial sketch | 30 min |
-| Move `ml/README.md` → `docs/ml-roadmap.md` | Consolidate ML docs | 30 min |
-| Delete `PRODUCT_GAPS.md` if exists | Superseded by LAUNCH_BLOCKERS.md | 10 min |
+| Task | Status |
+|------|--------|
+| Remove `hardware/embedded/` legacy firmware | ✅ Deleted |
+| Move `ml/README.md` → `docs/ml-roadmap.md` | ✅ Done |
+| Delete `PRODUCT_GAPS.md` if exists | ✅ Not found |

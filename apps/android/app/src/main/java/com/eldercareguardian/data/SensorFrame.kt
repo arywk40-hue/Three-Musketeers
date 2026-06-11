@@ -22,6 +22,7 @@ data class SensorFrame(
     val vitalsRisk: RiskStatus = RiskStatus.Low,
     val rrIntervalsMs: List<Int> = emptyList(),
     val imuMagnitude: Float = 9.81f,
+    val spo2Quality: Spo2Quality = Spo2Quality.Reliable,
     val sweatRatePercentPerMin: Float = 0f,
     val hrReservePercent: Int = 0,
     val bpEstimated: Boolean = true,
@@ -68,10 +69,16 @@ enum class CaregiverAlertStatus {
     Emergency,
 }
 
-enum class EcgAnomalyStatus {
-    Unknown,
-    Normal,
-    AFib,
-    Tachycardia,
-    Bradycardia,
+enum class Spo2Quality {
+    Reliable,
+    Unreliable,
+    NoSignal,
+}
+
+enum class EcgAnomalyStatus(val displayLabel: String) {
+    Unknown("Unknown"),
+    Normal("Normal"),
+    AFib("Irregular rhythm"),
+    Tachycardia("Elevated heart rate"),
+    Bradycardia("Low heart rate"),
 }

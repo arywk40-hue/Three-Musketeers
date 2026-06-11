@@ -51,6 +51,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.eldercareguardian.data.Patient
+import com.eldercareguardian.settings.DataRetentionPreferences
 import com.eldercareguardian.settings.isValidPhone
 import com.eldercareguardian.settings.phoneDigitCount
 import kotlinx.coroutines.delay
@@ -76,6 +77,8 @@ fun SettingsScreen(
     backendUrl: String,
     onBackendUrlChanged: (String) -> Unit,
     onSave: suspend (name: String, phone: String) -> Boolean,
+    retentionDays: Int = DataRetentionPreferences.DEFAULT_RETENTION_DAYS,
+    onRetentionDaysChanged: (Int) -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     patients: List<Patient> = emptyList(),
@@ -299,6 +302,11 @@ fun SettingsScreen(
             DataPrivacySection(
                 onExportData = onExportData,
                 onDeleteAllData = onDeleteAllData,
+            )
+
+            DataRetentionSection(
+                retentionDays = retentionDays,
+                onRetentionDaysChanged = onRetentionDaysChanged,
             )
 
             Text(
@@ -589,6 +597,61 @@ private fun DataPrivacySection(
             },
             onDismiss = { showDeleteConfirm = false },
         )
+    }
+}
+
+@Composable
+private fun DataRetentionSection(
+    retentionDays: Int,
+    onRetentionDaysChanged: (Int) -> Unit,
+) {
+    val options = listOf(7, 14, 30, 60, 90)
+
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Data retention",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Old alert and health records are automatically deleted after the selected period.",
+                color = Color(0xFF64748B),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                options.forEach { days ->
+                    val selected = retentionDays == days
+                    OutlinedButton(
+                        onClick = { onRetentionDaysChanged(days) },
+                        shape = RoundedCornerShape(6.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (selected) Color(0xFF0F766E) else Color.Transparent,
+                            contentColor = if (selected) Color.White else Color(0xFF334155),
+                        ),
+                        border = if (selected) null else null,
+                        modifier = Modifier.weight(1f).height(36.dp),
+                    ) {
+                        Text(
+                            text = "${days}d",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

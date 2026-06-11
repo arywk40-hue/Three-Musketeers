@@ -32,7 +32,7 @@ fun rhythmSeverity(status: EcgAnomalyStatus): RiskStatus = when (status) {
 fun rhythmDescription(status: EcgAnomalyStatus): String = when (status) {
     EcgAnomalyStatus.Unknown -> "Not enough RR intervals yet \u2014 algorithm needs at least 4 beats."
     EcgAnomalyStatus.Normal -> "Rhythm looks regular, RMSSD in expected range."
-    EcgAnomalyStatus.AFib -> "Irregular RR intervals \u2014 possible AFib, alert caregiver."
-    EcgAnomalyStatus.Tachycardia -> "Sustained HR \u2265 100 bpm \u2014 flag for review."
-    EcgAnomalyStatus.Bradycardia -> "Sustained HR \u2264 50 bpm \u2014 flag for review."
+    EcgAnomalyStatus.AFib -> "Irregular RR intervals with high variability \u2014 flag for caregiver review."
+    EcgAnomalyStatus.Tachycardia -> "Sustained elevated heart rate (\u2265 100 bpm) \u2014 flag for review."
+    EcgAnomalyStatus.Bradycardia -> "Sustained low heart rate (\u2264 50 bpm) \u2014 flag for review."
 }

@@ -93,6 +93,7 @@ fun SmartSuitApp(
     val patients by smartSuitViewModel.patients.collectAsState()
     val selectedPatientId by smartSuitViewModel.selectedPatientId.collectAsState()
     val selectedPatient by smartSuitViewModel.selectedPatient.collectAsState()
+    val retentionDays by smartSuitViewModel.retentionDays.collectAsState()
     val permissionController = rememberPermissionController()
     var selectedTab by remember { mutableStateOf(AppTab.Vitals) }
     var sessionMode by remember { mutableStateOf(SessionMode.Demo) }
@@ -146,6 +147,8 @@ fun SmartSuitApp(
                     backendUrl = backendUrl,
                     onBackendUrlChanged = smartSuitViewModel::setBackendUrl,
                     onUpdateCaregiverContact = smartSuitViewModel::updateCaregiverContact,
+                    retentionDays = retentionDays,
+                    onRetentionDaysChanged = smartSuitViewModel::setRetentionDays,
                     patients = patients,
                     selectedPatientId = selectedPatientId,
                     selectedPatient = selectedPatient,
@@ -243,6 +246,8 @@ private fun AppShell(
     onAcknowledgeUrgent: () -> Unit,
     smsEnabled: Boolean,
     onSmsEnabledChanged: (Boolean) -> Unit,
+    retentionDays: Int = 7,
+    onRetentionDaysChanged: (Int) -> Unit = {},
     backendUrl: String,
     onBackendUrlChanged: (String) -> Unit,
     caregiverDisplayName: String,
@@ -293,6 +298,8 @@ private fun AppShell(
                 onDeletePatient = onDeletePatient,
                 onExportData = onExportData,
                 onDeleteAllData = onDeleteAllData,
+                retentionDays = retentionDays,
+                onRetentionDaysChanged = onRetentionDaysChanged,
             )
         } else {
             val context = androidx.compose.ui.platform.LocalContext.current

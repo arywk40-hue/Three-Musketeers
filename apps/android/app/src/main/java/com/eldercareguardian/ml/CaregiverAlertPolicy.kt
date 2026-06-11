@@ -10,6 +10,9 @@ import java.util.Calendar
 /**
  * Four-level caregiver alert triage engine (Phase 7).
  *
+ * SpO2 debounce (Session 15): requires 3 consecutive low SpO2 readings
+ * before triggering an alert. The counter is reset on any normal reading.
+ *
  * Priority order (highest wins):
  *  Level 4 — Emergency:
  *   - SOS button pressed by patient
@@ -46,8 +49,16 @@ import java.util.Calendar
  * This engine only computes the level for the current frame.
  */
 object CaregiverAlertPolicy {
+    private const val SPO2_DEBOUNCE_THRESHOLD = 3
+    private var consecutiveLowSpo2 = 0
 
     fun evaluate(frame: SensorFrame): CaregiverAlertStatus {
+        // SpO2 debounce: track consecutive low readings
+        if (frame.spo2Percent < 96f) {
+            consecutiveLowSpo2++
+        } else {
+            consecutiveLowSpo2 = 0
+        }
         val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         return when {
             isEmergency(frame) -> CaregiverAlertStatus.Emergency
@@ -57,12 +68,16 @@ object CaregiverAlertPolicy {
         }
     }
 
+    fun reset() {
+        consecutiveLowSpo2 = 0
+    }
+
     // ── Level 4 — Emergency ──────────────────────────────────────────────────
 
     private fun isEmergency(frame: SensorFrame): Boolean {
         if (frame.sosActive) return true
         if (frame.fallRisk == RiskStatus.High) return true
-        if (frame.spo2Percent < 90f) return true
+        if (frame.spo2Percent < 90f && consecutiveLowSpo2 >= SPO2_DEBOUNCE_THRESHOLD) return true
         if (frame.heartRateBpm > 130) return true
         if (frame.heartRateBpm < 40) return true
         if (frame.ecgAnomaly == EcgAnomalyStatus.AFib) return true
@@ -72,7 +87,7 @@ object CaregiverAlertPolicy {
     // ── Level 3 — Warning ───────────────────────────────────────────────────
 
     private fun isWarning(frame: SensorFrame, currentHour: Int): Boolean {
-        if (frame.spo2Percent in 90f..94f) return true
+        if (frame.spo2Percent in 90f..94f && consecutiveLowSpo2 >= SPO2_DEBOUNCE_THRESHOLD) return true
         if (frame.heartRateBpm > 110) return true
         if (frame.heartRateBpm < 50) return true
         if (frame.vitalsRisk == RiskStatus.High) return true
@@ -90,7 +105,7 @@ object CaregiverAlertPolicy {
     private fun isCheck(frame: SensorFrame, currentHour: Int): Boolean {
         if (frame.heartRateBpm in 100..110) return true
         if (frame.heartRateBpm in 50..60) return true
-        if (frame.spo2Percent in 94f..96f) return true
+        if (frame.spo2Percent in 94f..96f && consecutiveLowSpo2 >= SPO2_DEBOUNCE_THRESHOLD) return true
         // Day-time: 20-minute inactivity threshold
         val isDaytime = currentHour in 6..21
         if (isDaytime && frame.inactivityMinutes >= InactivityMonitor.DAY_INACTIVITY_THRESHOLD_MINUTES) return true

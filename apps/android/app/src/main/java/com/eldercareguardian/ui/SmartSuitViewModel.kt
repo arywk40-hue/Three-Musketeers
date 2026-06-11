@@ -39,6 +39,7 @@ import com.eldercareguardian.samsung.SamsungHealthState
 import com.eldercareguardian.service.ElderCareMonitorService
 import com.eldercareguardian.settings.ActivePatientPreferences
 import com.eldercareguardian.settings.CaregiverPreferences
+import com.eldercareguardian.settings.DataRetentionPreferences
 import com.eldercareguardian.settings.isValidPhone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -65,6 +66,7 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     private val prefs = CaregiverPreferences.getInstance(application)
     private val activePatientPrefs = ActivePatientPreferences.getInstance(application)
     private val consentPrefs = com.eldercareguardian.consent.ConsentPreferences.getInstance(application)
+    private val retentionPrefs = DataRetentionPreferences.getInstance(application)
 
     private val _sosOverride = MutableStateFlow(false)
     val sosOverride: StateFlow<Boolean> = _sosOverride.asStateFlow()
@@ -119,6 +121,18 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     // Caregiver contact — collected from DataStore-backed flows. Initial value
     // is the DataStore default (empty phone, "Caregiver" name) so the UI has
     // something to render before the first read completes.
+    val retentionDays: StateFlow<Int> = retentionPrefs.retentionDays.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+        initialValue = DataRetentionPreferences.DEFAULT_RETENTION_DAYS,
+    )
+
+    fun setRetentionDays(days: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            retentionPrefs.setRetentionDays(days)
+        }
+    }
+
     val caregiverPhoneNumber: StateFlow<String> = prefs.caregiverPhone.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
@@ -211,11 +225,12 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
                     val patientId = _selectedPatientId.value
                     val eventEntity = event.copy(patientId = patientId).toEntity()
                     viewModelScope.launch(Dispatchers.IO) {
+                        val retentionMs = retentionPrefs.retentionDays.first() * 24L * 60 * 60 * 1000
                         alertEventDao.insert(eventEntity)
                         if (patientId == ActivePatientPreferences.DEFAULT_PATIENT_ID) {
-                            alertEventDao.deleteOlderThan(System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000L)
+                            alertEventDao.deleteOlderThan(System.currentTimeMillis() - retentionMs)
                         } else {
-                            alertEventDao.deleteOlderThanForPatient(patientId, System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000L)
+                            alertEventDao.deleteOlderThanForPatient(patientId, System.currentTimeMillis() - retentionMs)
                         }
                     }
                 }
@@ -242,8 +257,9 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
                     batteryPercent = frame.batteryPercent,
                 )
                 withContext(Dispatchers.IO) {
+                    val retentionMs = retentionPrefs.retentionDays.first() * 24L * 60 * 60 * 1000
                     healthDataDao.insert(snapshot.toEntity())
-                    healthDataDao.deleteOlderThanForPatient(patientId, System.currentTimeMillis() - 30 * 24 * 60 * 60 * 1000L) // 30-day retention
+                    healthDataDao.deleteOlderThanForPatient(patientId, System.currentTimeMillis() - retentionMs)
                 }
             }
         }
