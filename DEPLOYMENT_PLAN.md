@@ -8,7 +8,7 @@
 
 ## Overview
 
-A realistic deployment roadmap from current prototype → public product. This plan separates three tracks:
+A realistic deployment roadmap from current prototype → public product. This plan separates four tracks:
 
 - **Track A:** Android Play Store deployment  
 - **Track B:** Samsung Health certification  
@@ -16,6 +16,17 @@ A realistic deployment roadmap from current prototype → public product. This p
 - **Track D:** Pilot testing with real elderly users  
 
 Each track has independent timelines and can progress in parallel.
+
+### Current Status
+
+| Track | Progress | Remaining |
+|-------|----------|-----------|
+| **A — Play Store** | Package renamed, signing configured, CI/release pipeline, R8 rules, privacy policy + ToS, app icon, medical claims sweep, data retention, background location permission | Screenshots, Play Store listing, Data Safety section, beta submission |
+| **B — Samsung Health** | `SamsungHealthBridge` abstraction with `NoOp`/`Real` impl, `SamsungHealthState` UI | Download AAR + partner approval (4–8 weeks), physical device testing |
+| **C — Hardware** | ESP32-C3 prototype, BLE GATT profile defined, embedded firmware with watchdog | Custom PCB, certification ($8K), enclosure |
+| **D — Pilot** | Fall detection validation harness (SisFall), calibration report | Dataset download + run validation, recruit participants |
+
+**Blockers resolved:** All P0 (0 remaining), all P1 (0 remaining — B07/B10/B11 fixed), P2 (1 remaining — B14 single-point-of-failure deferred).
 
 ---
 
@@ -33,30 +44,37 @@ Each track has independent timelines and can progress in parallel.
 - [x] Create `proguard-rules.pro` with Room, SQLCipher, Gson rules
 - [x] Set `versionCode` auto-increment in CI (`VERSION_CODE`/`VERSION_NAME` env vars)
 - [x] CI release job: base64 keystore decode → `bundleRelease` with env-based signing
-- [ ] Fill `AndroidManifest.xml` with `android:icon`, `android:roundIcon` — **not yet done**
-- [ ] Create app icon (512×512 PNG + adaptive icon) — **not yet done**
+- [x] Fill `AndroidManifest.xml` with `android:icon` — **done — done**
+- [x] Create adaptive app icon — **done — done**
+- [ ] Generate 512×512 PNG for Play Store (use Android Studio Image Asset Studio)
 - [ ] Write app description, screenshots for Play Store listing — docs/play-store-listing.md created, screenshots not captured
 - [x] Set `targetSdkVersion = 35` (required for new apps on Play)
 - [ ] Handle `SEND_SMS` permission — Play Store requires justification
 
 ### Play Store Policy Compliance
-- Remove any diagnostic claims ("diagnoses", "detects AFib") from app description — **not yet done**
-- Use wellness language: "wellness monitoring", "activity tracking", "caregiver alerts"
-- [x] Privacy policy page created at `apps/privacy-policy/index.html` (Session 9)
-- [ ] Host privacy policy on GitHub Pages (`gh-pages` branch)
+- [x] Remove any diagnostic claims from app — **done**
+- [x] Use wellness language throughout UI — **done — done**
+- [x] Privacy policy page created at `apps/privacy-policy/index.html` — done
+- [x] Terms of Service page created at `apps/tos/index.html` — done
+- [x] GitHub Pages deploy workflow at `.github/workflows/pages.yml` — done
+- [ ] Host privacy policy on GitHub Pages (`gh-pages` branch) — workflow auto-deploys apps/tos/, but apps/privacy-policy not yet in pages.yml path
 - [ ] Add privacy policy URL to Play Store listing
 - [ ] Add a Data Safety section (health data stored locally, not shared)
 
 ### Timeline
-| Milestone | Duration |
-|---|---|
-| Package rename + signing setup | 1 day ✅ Done |
-| R8 rules + minification testing | 2 days ✅ Done |
-| CI release pipeline | 2 days ✅ Done (Session 8) |
-| Privacy policy page | 1 day ✅ Done (Session 9) |
-| Play Store listing creation (icon, screenshots, description) | 2 days |
-| Internal testing track (closed beta) | 1 week |
-| Production submission + review | 1–2 weeks |
+| Milestone | Duration | Status |
+|---|---|---|
+| Package rename + signing setup | 1 day | ✅ Done |
+| R8 rules + minification testing | 2 days | ✅ Done |
+| CI release pipeline | 2 days | ✅ Done |
+| Privacy policy page | 1 day | ✅ Done |
+| Terms of Service page | 1 day | ✅ Done |
+| App icon + adaptive icon resources | 1 day | ✅ Done |
+| Medical claims language sweep | 2 days | ✅ Done |
+| Configurable data retention | 2 days | ✅ Done |
+| Play Store listing creation (screenshots, description, Data Safety) | 2–3 days | ⏳ Pending |
+| Internal testing track (closed beta) | 1 week | ⏳ Pending |
+| Production submission + review | 1–2 weeks | ⏳ Pending |
 
 ---
 
