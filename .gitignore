@@ -9,3 +9,12 @@ google-services.json
 # Node
 node_modules/
 
+# SisFall dataset (1.5 GB — keep out of repo)
+ml/data/
+ml/data/content/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+

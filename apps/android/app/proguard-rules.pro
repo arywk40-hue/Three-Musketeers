@@ -52,3 +52,7 @@
 
 # ── Bluetooth GATT callbacks ──
 -keepclassmembers class * extends android.bluetooth.BluetoothGattCallback { *; }
+
+# ── TensorFlow Lite ──
+-keep class org.tensorflow.lite.** { *; }
+-dontwarn org.tensorflow.lite.**

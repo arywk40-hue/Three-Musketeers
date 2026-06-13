@@ -31,6 +31,7 @@ import com.eldercareguardian.database.toEntity
 import com.eldercareguardian.database.toHealthSnapshot
 import com.eldercareguardian.database.toPatient
 import com.eldercareguardian.ml.AlertHistoryTracker
+import com.eldercareguardian.ml.FallDetectionTfliteModel
 import com.eldercareguardian.notifications.CaregiverAlertDispatcher
 import com.eldercareguardian.notifications.FcmAlertSender
 import com.eldercareguardian.notifications.FcmTokenManager
@@ -65,6 +66,7 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     private val bleDataSource = SmartSuitBleDataSource(application.applicationContext)
 
     private val _frameSource = MutableStateFlow<Flow<SensorFrame>>(simulator.frames)
+    private val tfliteModel = FallDetectionTfliteModel(application)
 
     fun loadJsonFile(uri: Uri) {
         viewModelScope.launch {
@@ -163,7 +165,7 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     val frames: StateFlow<SensorFrame?> = _frameSource.flatMapLatest { source: Flow<SensorFrame> ->
         combine(source, bleDataSource.telemetry, _sosOverride) { simFrame: SensorFrame, bleTelemetry: SmartSuitBleTelemetry, sosActive: Boolean ->
             val baseFrame = if (bleDataSource.connectionState.value == BleConnectionState.Connected && bleTelemetry.heartRateBpm != null) {
-                SensorFrameMerger.merge(simFrame, bleTelemetry)
+                SensorFrameMerger.merge(simFrame, bleTelemetry, tfliteModel)
             } else {
                 simFrame
             }
