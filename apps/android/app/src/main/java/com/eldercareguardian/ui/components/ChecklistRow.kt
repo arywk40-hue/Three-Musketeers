@@ -13,9 +13,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.eldercareguardian.ui.theme.AppColors
 
 @Composable
 fun ChecklistRow(label: String, checked: Boolean) {
@@ -24,17 +24,17 @@ fun ChecklistRow(label: String, checked: Boolean) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = Color(0xFF475569), style = MaterialTheme.typography.bodyMedium)
+        Text(label, color = AppColors.textSecondary, style = MaterialTheme.typography.bodyMedium)
         Box(
             modifier = Modifier
                 .size(28.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(if (checked) Color(0xFFDCFCE7) else Color(0xFFFEE2E2)),
+                .background(if (checked) AppColors.successLight else AppColors.dangerLight),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = if (checked) "OK" else "\u2014\u2014",
-                color = if (checked) Color(0xFF15803D) else Color(0xFFB91C1C),
+                color = if (checked) AppColors.success else AppColors.danger,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
             )

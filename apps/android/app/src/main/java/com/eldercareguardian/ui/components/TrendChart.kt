@@ -21,20 +21,21 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.eldercareguardian.ui.theme.AppColors
 
 @Composable
 fun TrendChart(
     label: String,
     values: List<Float>,
     unit: String,
-    lineColor: Color = Color(0xFF0F766E),
+    lineColor: Color = AppColors.primary,
     modifier: Modifier = Modifier,
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
             modifier = Modifier
@@ -48,7 +49,7 @@ fun TrendChart(
             ) {
                 Text(
                     text = label,
-                    color = Color(0xFF64748B),
+                    color = AppColors.textSecondary,
                     style = MaterialTheme.typography.labelLarge,
                 )
                 if (values.isNotEmpty()) {
@@ -65,7 +66,7 @@ fun TrendChart(
                     .fillMaxWidth()
                     .height(52.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFFF8FAFC)),
+                    .background(AppColors.surfaceTertiary),
             ) {
                 if (values.size > 1) {
                     val minVal = values.min()

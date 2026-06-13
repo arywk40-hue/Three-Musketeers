@@ -18,11 +18,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.eldercareguardian.data.AlertEvent
 import com.eldercareguardian.data.CaregiverAlertStatus
+import com.eldercareguardian.ui.theme.AppColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -34,21 +34,17 @@ fun AlertTimeline(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                text = "Alert history",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
+            com.eldercareguardian.ui.components.SectionTitle("Alert history")
             if (events.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -58,7 +54,7 @@ fun AlertTimeline(
                 ) {
                     Text(
                         text = "No alerts this session",
-                        color = Color(0xFF94A3B8),
+                        color = AppColors.textTertiary,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -74,10 +70,10 @@ fun AlertTimeline(
 @Composable
 private fun AlertTimelineRow(event: AlertEvent) {
     val levelColor = when (event.level) {
-        CaregiverAlertStatus.Emergency -> Color(0xFFB91C1C)
-        CaregiverAlertStatus.Warning -> Color(0xFFEA580C)
-        CaregiverAlertStatus.Check -> Color(0xFFD97706)
-        CaregiverAlertStatus.Normal -> Color(0xFF0F766E)
+        CaregiverAlertStatus.Emergency -> AppColors.danger
+        CaregiverAlertStatus.Warning -> AppColors.warning
+        CaregiverAlertStatus.Check -> AppColors.warning
+        CaregiverAlertStatus.Normal -> AppColors.primary
     }
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
 
@@ -95,7 +91,7 @@ private fun AlertTimelineRow(event: AlertEvent) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text = event.reason.displayLabel,
-                color = Color(0xFF0F172A),
+                color = AppColors.textPrimary,
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -119,7 +115,7 @@ private fun AlertTimelineRow(event: AlertEvent) {
             }
             Text(
                 text = timeFormat.format(Date(event.timestampMillis)),
-                color = Color(0xFF94A3B8),
+                color = AppColors.textTertiary,
                 style = MaterialTheme.typography.labelSmall,
             )
         }

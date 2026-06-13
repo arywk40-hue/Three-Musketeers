@@ -6,6 +6,7 @@ import com.eldercareguardian.ml.DehydrationRiskModel
 import com.eldercareguardian.ml.EcgAnomalyDetector
 import com.eldercareguardian.ml.FallConfirmationBuffer
 import com.eldercareguardian.ml.FallDetectionEngine
+import com.eldercareguardian.ml.FallDetectionTfliteModel
 import com.eldercareguardian.ml.HeartRateExtractor
 import com.eldercareguardian.ml.InactivityMonitor
 import com.eldercareguardian.ml.OverexertionModel
@@ -14,10 +15,10 @@ import kotlin.math.sqrt
 
 object SensorFrameMerger {
     private val fallBuffer = FallConfirmationBuffer()
-    private val fallDetectionEngine = FallDetectionEngine()
+    private val fallDetectionEngine = FallDetectionEngine
     private var inactivitySeconds = 0
 
-    fun merge(base: SensorFrame, ble: SmartSuitBleTelemetry): SensorFrame {
+    fun merge(base: SensorFrame, ble: SmartSuitBleTelemetry, tfliteModel: FallDetectionTfliteModel? = null): SensorFrame {
         val hasBle = ble.heartRateBpm != null
         if (!hasBle) return base
 
@@ -28,7 +29,8 @@ object SensorFrameMerger {
         val ecgSamples = ble.ecgSamples.takeIf { it.size == 256 } ?: base.ecgSamples
 
         val fall = if (ble.wristImu.size >= 6) {
-            fallDetectionEngine.assess(ble.wristImu)
+            tfliteModel?.assess(ble.wristImu)?.takeIf { it.riskScore >= 0.5f }
+                ?: fallDetectionEngine.assess(ble.wristImu)
         } else {
             null
         }

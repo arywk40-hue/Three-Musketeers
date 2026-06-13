@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.flow
 
 class SmartSuitSimulator : SmartSuitDataSource {
     private val fallBuffer = FallConfirmationBuffer()
-    private val fallDetectionEngine = FallDetectionEngine()
+    private val fallDetectionEngine = FallDetectionEngine
 
     override val frames: Flow<SensorFrame> = flow {
         var tick = 0

@@ -16,17 +16,23 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.eldercareguardian.ui.theme.AppColors
 
 @Composable
-fun SignalRow(label: String, value: String, progress: Float) {
+fun SignalRow(
+    label: String,
+    value: String,
+    progress: Float,
+    barColor: Color = AppColors.progressColor(progress),
+) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(label, color = Color(0xFF475569), style = MaterialTheme.typography.bodyMedium)
-            Text(value, color = Color(0xFF0F172A), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Text(label, color = AppColors.textSecondary, style = MaterialTheme.typography.bodyMedium)
+            Text(value, color = AppColors.textPrimary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         }
         LinearProgressIndicator(
             progress = { progress.coerceIn(0f, 1f) },
@@ -34,8 +40,8 @@ fun SignalRow(label: String, value: String, progress: Float) {
                 .fillMaxWidth()
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp)),
-            color = Color(0xFF0F766E),
-            trackColor = Color(0xFFE2E8F0),
+            color = barColor,
+            trackColor = AppColors.borderLight,
         )
     }
 }

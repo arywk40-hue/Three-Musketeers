@@ -10,7 +10,8 @@ class FallDetectionEngineTest {
 
     @Before
     fun reset() {
-        engine = FallDetectionEngine()
+        engine = FallDetectionEngine
+        FallDetectionEngine.reset()
     }
 
     @Test

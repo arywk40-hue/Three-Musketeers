@@ -10,7 +10,7 @@ class FallDetectionEnginePhase5Test {
 
     @Before
     fun setUp() {
-        engine = FallDetectionEngine()
+        engine = FallDetectionEngine; engine.reset()
     }
 
     private fun normalFrame(mag: Float = 9.81f): List<Float> =
@@ -44,14 +44,14 @@ class FallDetectionEnginePhase5Test {
 
     @Test
     fun `single spike frame alone returns Medium risk not High`() {
-        engine = FallDetectionEngine()
+        engine = FallDetectionEngine; engine.reset()
         val result = engine.assess(spikeFrame(22f))
         assert(result.riskStatus in listOf(RiskStatus.Low, RiskStatus.Medium))
     }
 
     @Test
     fun `consecutive spike frames with no stillness returns Medium`() {
-        engine = FallDetectionEngine()
+        engine = FallDetectionEngine; engine.reset()
         var lastResult = engine.assess(spikeFrame(22f))
         lastResult = engine.assess(spikeFrame(22f))
         assertEquals(RiskStatus.Medium, lastResult.riskStatus)
@@ -59,7 +59,7 @@ class FallDetectionEnginePhase5Test {
 
     @Test
     fun `spike followed by stillness returns High risk`() {
-        engine = FallDetectionEngine()
+        engine = FallDetectionEngine; engine.reset()
         engine.assess(spikeFrame(22f))
         engine.assess(spikeFrame(22f))
         engine.assess(stillFrame(1.5f))
@@ -70,7 +70,7 @@ class FallDetectionEnginePhase5Test {
 
     @Test
     fun `High risk resets engine for next event`() {
-        engine = FallDetectionEngine()
+        engine = FallDetectionEngine; engine.reset()
         engine.assess(spikeFrame(22f))
         engine.assess(spikeFrame(22f))
         engine.assess(stillFrame(1.5f))
@@ -82,7 +82,7 @@ class FallDetectionEnginePhase5Test {
 
     @Test
     fun `sustained stillness without prior spike does not return High`() {
-        engine = FallDetectionEngine()
+        engine = FallDetectionEngine; engine.reset()
         repeat(10) {
             val result = engine.assess(stillFrame(1.5f))
             assert(result.riskStatus != RiskStatus.High) {
@@ -93,7 +93,7 @@ class FallDetectionEnginePhase5Test {
 
     @Test
     fun `spike window expires after multiple normal frames`() {
-        engine = FallDetectionEngine()
+        engine = FallDetectionEngine; engine.reset()
         engine.assess(spikeFrame(22f))
         engine.assess(spikeFrame(22f))
         repeat(10) { engine.assess(normalFrame()) }
@@ -116,7 +116,7 @@ class FallDetectionEnginePhase5Test {
 
     @Test
     fun `acceleration magnitude is computed correctly`() {
-        engine = FallDetectionEngine()
+        engine = FallDetectionEngine; engine.reset()
         val result = engine.assess(listOf(0f, 0f, 9.81f, 0f, 0f, 0f))
         assertEquals(9.81f, result.accelerationMagnitude, 0.01f)
     }

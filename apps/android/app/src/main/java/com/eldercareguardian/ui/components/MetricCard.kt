@@ -17,13 +17,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.eldercareguardian.ui.theme.AppColors
 
 @Composable
-fun MetricCard(label: String, value: String, unit: String, modifier: Modifier = Modifier) {
+fun MetricCard(
+    label: String,
+    value: String,
+    unit: String,
+    modifier: Modifier = Modifier,
+    accentColor: Color = AppColors.primary,
+) {
     Card(
         modifier = modifier.height(92.dp),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
@@ -32,13 +39,22 @@ fun MetricCard(label: String, value: String, unit: String, modifier: Modifier = 
                 .padding(12.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(label, color = Color(0xFF64748B), style = MaterialTheme.typography.labelLarge)
+            Text(
+                text = label,
+                color = AppColors.textSecondary,
+                style = MaterialTheme.typography.labelLarge,
+            )
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = AppColors.textPrimary,
+                )
                 Text(
                     text = " $unit",
                     modifier = Modifier.padding(bottom = 3.dp),
-                    color = Color(0xFF64748B),
+                    color = AppColors.textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }

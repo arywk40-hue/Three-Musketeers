@@ -13,9 +13,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.eldercareguardian.ui.theme.AppColors
 
 @Composable
 fun BatteryRow(percent: Int?) {
@@ -28,8 +28,8 @@ fun BatteryRow(percent: Int?) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Device battery", color = Color(0xFF475569), style = MaterialTheme.typography.bodyMedium)
-            Text(display, color = Color(0xFF0F172A), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Text("Device battery", color = AppColors.textSecondary, style = MaterialTheme.typography.bodyMedium)
+            Text(display, color = AppColors.textPrimary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         }
         LinearProgressIndicator(
             progress = { progress },
@@ -37,13 +37,13 @@ fun BatteryRow(percent: Int?) {
                 .fillMaxWidth()
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp)),
-            color = if (isLow) Color(0xFFB91C1C) else Color(0xFF0F766E),
-            trackColor = Color(0xFFE2E8F0),
+            color = if (isLow) AppColors.danger else AppColors.primary,
+            trackColor = AppColors.borderLight,
         )
         if (isLow) {
             Text(
                 "Battery low \u2014 please charge the device",
-                color = Color(0xFFB91C1C),
+                color = AppColors.danger,
                 style = MaterialTheme.typography.bodySmall,
             )
         }

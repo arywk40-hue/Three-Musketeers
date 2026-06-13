@@ -5,12 +5,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
+import android.net.Uri
 import android.Manifest
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.eldercareguardian.MainActivity
 import com.eldercareguardian.ble.BleConnectionState
 import com.eldercareguardian.ble.DiscoveredBleDevice
+import com.eldercareguardian.ble.JsonFileDataSource
 import com.eldercareguardian.ble.SmartSuitBleDataSource
 import com.eldercareguardian.ble.SmartSuitBleTelemetry
 import com.eldercareguardian.ble.SmartSuitSimulator
@@ -48,15 +50,29 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SmartSuitViewModel(application: Application) : AndroidViewModel(application) {
     private val simulator = SmartSuitSimulator()
     private val bleDataSource = SmartSuitBleDataSource(application.applicationContext)
+
+    private val _frameSource = MutableStateFlow<Flow<SensorFrame>>(simulator.frames)
+
+    fun loadJsonFile(uri: Uri) {
+        viewModelScope.launch {
+            _frameSource.value = JsonFileDataSource(
+                getApplication<Application>().contentResolver, uri
+            ).frames
+        }
+    }
     private val samsungBridge: SamsungHealthBridge = SamsungHealthBridgeProvider.create(application)
     private val db = ElderCareDatabase.getInstance(application.applicationContext)
     private val patientDao = db.patientDao()
@@ -144,20 +160,18 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
         initialValue = CaregiverPreferences.DEFAULT_NAME,
     )
 
-    val frames: StateFlow<SensorFrame?> = combine(
-        simulator.frames,
-        bleDataSource.telemetry,
-        _sosOverride,
-    ) { simFrame, bleTelemetry, sosActive ->
-        val baseFrame = if (bleDataSource.connectionState.value == BleConnectionState.Connected && bleTelemetry.heartRateBpm != null) {
-            SensorFrameMerger.merge(simFrame, bleTelemetry)
-        } else {
-            simFrame
-        }
-        if (sosActive) {
-            baseFrame.copy(sosActive = true, caregiverAlert = CaregiverAlertStatus.Emergency)
-        } else {
-            baseFrame
+    val frames: StateFlow<SensorFrame?> = _frameSource.flatMapLatest { source: Flow<SensorFrame> ->
+        combine(source, bleDataSource.telemetry, _sosOverride) { simFrame: SensorFrame, bleTelemetry: SmartSuitBleTelemetry, sosActive: Boolean ->
+            val baseFrame = if (bleDataSource.connectionState.value == BleConnectionState.Connected && bleTelemetry.heartRateBpm != null) {
+                SensorFrameMerger.merge(simFrame, bleTelemetry)
+            } else {
+                simFrame
+            }
+            if (sosActive) {
+                baseFrame.copy(sosActive = true, caregiverAlert = CaregiverAlertStatus.Emergency)
+            } else {
+                baseFrame
+            }
         }
     }.stateIn(
         scope = viewModelScope,

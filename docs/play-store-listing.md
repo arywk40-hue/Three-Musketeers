@@ -70,6 +70,19 @@ Host the `apps/privacy-policy/index.html` page via GitHub Pages from a `gh-pages
 7. **Production track** → Upload the signed AAB from `./gradlew bundleRelease`.
 8. Release rollout → Start with 10% staged rollout, monitor crash rate for 48h.
 
+## SEND_SMS Permission Justification
+
+The app declares `android.permission.SEND_SMS` for one purpose only:
+
+| Field | Value |
+|-------|-------|
+| **Feature** | Emergency caregiver SMS alerts |
+| **Why it's needed** | When the wearable detects a fall, sustained abnormal vitals, or the patient presses SOS, the app sends an SMS to the designated caregiver's phone number. SMS is used as a fallback channel when push notifications (FCM) fail — e.g., if the caregiver's internet is down. |
+| **User-facing toggle** | Settings → Enable SMS alerts (off by default, user must opt in) |
+| **Data sent** | Only the caregiver's phone number (user-configured) and a pre-defined alert message template. No health data, no PII beyond the phone number itself. |
+| **No SMS read** | The app never reads incoming SMS. `SEND_SMS` is write-only. |
+| **No cost without consent** | The user must explicitly enable SMS and grant the permission at runtime. |
+
 ## Data Safety Section (Play Console)
 
 | Question | Answer |

@@ -3,11 +3,17 @@ package com.eldercareguardian.ui.screens
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -33,6 +39,7 @@ import com.eldercareguardian.ui.components.SectionTitle
 import com.eldercareguardian.ui.components.SignalRow
 import com.eldercareguardian.ui.components.StatusPill
 import com.eldercareguardian.ui.components.TrendChart
+import com.eldercareguardian.ui.theme.AppColors
 import com.eldercareguardian.ui.riskProgress
 import com.eldercareguardian.ui.rhythmDescription
 import com.eldercareguardian.ui.rhythmSeverity
@@ -59,14 +66,14 @@ fun VitalsScreen(
                 label = "HR trend",
                 values = hrTrend,
                 unit = "bpm",
-                lineColor = Color(0xFFDC2626),
+                lineColor = AppColors.danger,
                 modifier = Modifier.weight(1f),
             )
             TrendChart(
-                label = "SpO\u2082 trend",
+                label = "SpO2 trend",
                 values = spo2Trend,
                 unit = "%",
-                lineColor = Color(0xFF2563EB),
+                lineColor = AppColors.primary,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -77,34 +84,51 @@ fun VitalsScreen(
 @Composable
 private fun EcgPanel(samples: List<Float>) {
     Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("ECG", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "ECG",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF94A3B8),
+                )
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF22C55E)),
+                )
+            }
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(116.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFFF1F5F9))
+                    .height(140.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF0F0F23)),
             ) {
                 if (samples.size > 1) {
                     val step = size.width / (samples.lastIndex).coerceAtLeast(1)
-                    val middle = size.height * 0.54f
-                    val scale = size.height * 0.38f
+                    val middle = size.height * 0.5f
+                    val scale = size.height * 0.4f
                     val path = Path()
                     samples.forEachIndexed { index, value ->
                         val point = Offset(index * step, middle - value * scale)
                         if (index == 0) path.moveTo(point.x, point.y) else path.lineTo(point.x, point.y)
                     }
-                    drawPath(path, color = Color(0xFF0F766E), style = Stroke(width = 4f))
+                    drawPath(path, color = Color(0xFF22C55E), style = Stroke(width = 3f))
                 }
             }
         }
@@ -112,51 +136,86 @@ private fun EcgPanel(samples: List<Float>) {
 }
 
 @Composable
-private fun SpO2QualityChip(quality: Spo2Quality) {
-    val (color, text) = when (quality) {
-        Spo2Quality.Reliable -> Color(0xFF0F766E) to "Signal reliable"
-        Spo2Quality.Unreliable -> Color(0xFFB45309) to "Signal unreliable"
-        Spo2Quality.NoSignal -> Color(0xFFB91C1C) to "No signal"
+private fun SpO2Card(
+    value: String,
+    quality: Spo2Quality,
+    modifier: Modifier = Modifier,
+) {
+    val (tint, label) = when (quality) {
+        Spo2Quality.Reliable -> AppColors.success to "Reliable"
+        Spo2Quality.Unreliable -> AppColors.warning to "Unreliable"
+        Spo2Quality.NoSignal -> AppColors.danger to "No signal"
     }
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(color.copy(alpha = 0.12f))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+    Card(
+        modifier = modifier.height(92.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Text(
-            text = text,
-            color = color,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("SpO2", color = AppColors.textSecondary, style = MaterialTheme.typography.labelLarge)
+            Column {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = AppColors.textPrimary)
+                    Text(
+                        text = " %",
+                        modifier = Modifier.padding(bottom = 3.dp),
+                        color = AppColors.textTertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(tint),
+                    )
+                }
+                Text(
+                    text = label,
+                    color = tint,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun EcgAnomalyCard(status: EcgAnomalyStatus) {
     Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            SectionTitle("ECG rhythm", accentColor = rhythmSeverity(status).let { severity ->
+                when (severity) {
+                    com.eldercareguardian.data.RiskStatus.High -> AppColors.danger
+                    com.eldercareguardian.data.RiskStatus.Medium -> AppColors.warning
+                    com.eldercareguardian.data.RiskStatus.Low -> AppColors.primary
+                }
+            })
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                SectionTitle("ECG rhythm")
                 StatusPill(label = status.displayLabel, status = PillStatus.Risk(rhythmSeverity(status)))
             }
             Text(
                 text = rhythmDescription(status),
-                color = Color(0xFF475569),
+                color = AppColors.textSecondary,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -165,24 +224,35 @@ private fun EcgAnomalyCard(status: EcgAnomalyStatus) {
 
 @Composable
 private fun MetricGrid(frame: SensorFrame) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            MetricCard("HR", "${frame.heartRateBpm}", "bpm", Modifier.weight(1f))
-            MetricCard("SpO2", "%.1f".format(frame.spo2Percent), "%", Modifier.weight(1f))
-        }
-        SpO2QualityChip(frame.spo2Quality)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            MetricCard(
-                label = "BP",
-                value = "${frame.systolicMmHg}/${frame.diastolicMmHg}",
-                unit = if (frame.bpEstimated) "est mmHg" else "mmHg",
-                modifier = Modifier.weight(1f),
-            )
-            MetricCard("Temp", "%.1f".format(frame.skinTempC), "C", Modifier.weight(1f))
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            MetricCard("Resp", "${frame.respiratoryRate}", "/min", Modifier.weight(1f))
-            MetricCard("HR reserve", "${frame.hrReservePercent}", "%", Modifier.weight(1f))
+    Card(
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SectionTitle("Vitals")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                MetricCard("HR", "${frame.heartRateBpm}", "bpm", Modifier.weight(1f))
+                SpO2Card("%.1f".format(frame.spo2Percent), frame.spo2Quality, Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                MetricCard(
+                    label = "BP",
+                    value = "${frame.systolicMmHg}/${frame.diastolicMmHg}",
+                    unit = if (frame.bpEstimated) "est mmHg" else "mmHg",
+                    modifier = Modifier.weight(1f),
+                )
+                MetricCard("Temp", "%.1f".format(frame.skinTempC), "C", Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                MetricCard("Resp", "${frame.respiratoryRate}", "/min", Modifier.weight(1f))
+                MetricCard("HR reserve", "${frame.hrReservePercent}", "%", Modifier.weight(1f))
+            }
         }
     }
 }
@@ -190,25 +260,30 @@ private fun MetricGrid(frame: SensorFrame) {
 @Composable
 private fun HealthPanel(frame: SensorFrame) {
     Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SectionTitle("Health")
             SignalRow("Respiratory rate", "${frame.respiratoryRate} breaths/min", 0.62f)
             SignalRow("Sweat humidity", "%.1f%%".format(frame.humidityPercent), frame.humidityPercent / 100f)
             SignalRow("Sweat rate", "%.2f %%/min".format(frame.sweatRatePercentPerMin), (frame.sweatRatePercentPerMin / 2f).coerceIn(0f, 1f))
-            SignalRow("Dehydration risk", frame.dehydration.name, riskProgress(frame.dehydration))
-            HorizontalDivider(color = Color(0xFFE2E8F0))
+            val dehydrationColor = when {
+                frame.dehydration == com.eldercareguardian.data.RiskStatus.High -> AppColors.danger
+                frame.dehydration == com.eldercareguardian.data.RiskStatus.Medium -> AppColors.warning
+                else -> AppColors.primary
+            }
+            SignalRow("Dehydration risk", frame.dehydration.name, riskProgress(frame.dehydration), barColor = dehydrationColor)
+            HorizontalDivider(color = AppColors.borderLight)
             Text(
                 text = "Vitals are stored locally first; Samsung Health write support activates after SDK approval.",
-                color = Color(0xFF64748B),
+                color = AppColors.textTertiary,
                 style = MaterialTheme.typography.bodySmall,
             )
         }

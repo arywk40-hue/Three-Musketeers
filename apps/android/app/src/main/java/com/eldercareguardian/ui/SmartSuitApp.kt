@@ -98,6 +98,13 @@ fun SmartSuitApp(
     var selectedTab by remember { mutableStateOf(AppTab.Vitals) }
     var sessionMode by remember { mutableStateOf(SessionMode.Demo) }
 
+    val jsonFilePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { smartSuitViewModel.loadJsonFile(it) }
+    }
+    val onLoadJsonFile: () -> Unit = { jsonFilePickerLauncher.launch("*/*") }
+
     MaterialTheme(
         colorScheme = MaterialTheme.colorScheme.copy(
             primary = Color(0xFF0F766E),
@@ -158,6 +165,7 @@ fun SmartSuitApp(
                     onDeletePatient = smartSuitViewModel::deletePatient,
                     onExportData = smartSuitViewModel::exportData,
                     onDeleteAllData = smartSuitViewModel::deleteAllData,
+                    onLoadJsonFile = onLoadJsonFile,
                 )
             } ?: LoadingScreen()
         }
@@ -263,6 +271,7 @@ private fun AppShell(
     onDeletePatient: suspend (Patient) -> Unit,
     onExportData: suspend (android.content.Context) -> android.content.Intent,
     onDeleteAllData: () -> Unit,
+    onLoadJsonFile: () -> Unit,
 ) {
     Scaffold(
         bottomBar = {
@@ -300,6 +309,7 @@ private fun AppShell(
                 onDeleteAllData = onDeleteAllData,
                 retentionDays = retentionDays,
                 onRetentionDaysChanged = onRetentionDaysChanged,
+                onLoadJsonFile = onLoadJsonFile,
             )
         } else {
             val context = androidx.compose.ui.platform.LocalContext.current
@@ -650,6 +660,7 @@ private fun AppShellVitalsPreview() {
             onDeletePatient = {},
             onExportData = { android.content.Intent() },
             onDeleteAllData = {},
+            onLoadJsonFile = {},
         )
     }
 }

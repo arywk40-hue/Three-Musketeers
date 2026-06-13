@@ -90,6 +90,7 @@ fun SettingsScreen(
     onDeletePatient: suspend (Patient) -> Unit = {},
     onExportData: suspend (Context) -> Intent = { Intent() },
     onDeleteAllData: () -> Unit = {},
+    onLoadJsonFile: () -> Unit = {},
 ) {
     var name by remember { mutableStateOf(TextFieldValue(initialName)) }
     var phone by remember { mutableStateOf(TextFieldValue(initialPhone)) }
@@ -302,6 +303,10 @@ fun SettingsScreen(
             DataPrivacySection(
                 onExportData = onExportData,
                 onDeleteAllData = onDeleteAllData,
+            )
+
+            DataSourceSection(
+                onLoadJsonFile = onLoadJsonFile,
             )
 
             DataRetentionSection(
@@ -673,6 +678,42 @@ private fun ConfirmationDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
+}
+
+@Composable
+private fun DataSourceSection(
+    onLoadJsonFile: () -> Unit,
+) {
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Data source",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "By default the app runs in demo mode with simulated sensor data. You can also load a JSON file containing recorded sensor frames.",
+                color = Color(0xFF64748B),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Button(
+                onClick = onLoadJsonFile,
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Load JSON file")
+            }
+        }
+    }
 }
 
 @Preview(showBackground = true)

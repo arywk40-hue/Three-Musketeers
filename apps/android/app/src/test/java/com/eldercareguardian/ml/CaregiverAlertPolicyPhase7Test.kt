@@ -7,6 +7,7 @@ import com.eldercareguardian.data.PostureStatus
 import com.eldercareguardian.data.RiskStatus
 import com.eldercareguardian.data.SensorFrame
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -14,6 +15,11 @@ import org.junit.Test
  * Covers all level boundaries and priority ordering.
  */
 class CaregiverAlertPolicyPhase7Test {
+
+    @Before
+    fun setUp() {
+        CaregiverAlertPolicy.reset()
+    }
 
     private fun normalFrame(): SensorFrame = SensorFrame(
         timestampMillis = System.currentTimeMillis(),
@@ -55,6 +61,7 @@ class CaregiverAlertPolicyPhase7Test {
     @Test
     fun `SpO2 below 90 triggers Emergency`() {
         val frame = normalFrame().copy(spo2Percent = 89f)
+        repeat(3) { CaregiverAlertPolicy.evaluate(frame) }
         assertEquals(CaregiverAlertStatus.Emergency, CaregiverAlertPolicy.evaluate(frame))
     }
 
@@ -88,6 +95,7 @@ class CaregiverAlertPolicyPhase7Test {
     @Test
     fun `SpO2 at 92 percent triggers Warning`() {
         val frame = normalFrame().copy(spo2Percent = 92f)
+        repeat(3) { CaregiverAlertPolicy.evaluate(frame) }
         assertEquals(CaregiverAlertStatus.Warning, CaregiverAlertPolicy.evaluate(frame))
     }
 
@@ -138,6 +146,7 @@ class CaregiverAlertPolicyPhase7Test {
     @Test
     fun `SpO2 at 95 percent triggers Check`() {
         val frame = normalFrame().copy(spo2Percent = 95f)
+        repeat(3) { CaregiverAlertPolicy.evaluate(frame) }
         assertEquals(CaregiverAlertStatus.Check, CaregiverAlertPolicy.evaluate(frame))
     }
 

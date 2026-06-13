@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.eldercareguardian.data.AlertEvent
+import com.eldercareguardian.ui.theme.AppColors
 
 @Composable
 fun UrgentAlertBanner(
@@ -53,8 +54,8 @@ fun UrgentAlertBanner(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFB91C1C).copy(alpha = pulseAlpha)),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.danger.copy(alpha = pulseAlpha)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Row(
@@ -91,7 +92,7 @@ fun UrgentAlertBanner(
             }
             OutlinedButton(
                 onClick = onAcknowledge,
-                shape = RoundedCornerShape(6.dp),
+                shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                 border = ButtonDefaults.outlinedButtonBorder.copy(
                     brush = SolidColor(Color.White.copy(alpha = 0.6f)),

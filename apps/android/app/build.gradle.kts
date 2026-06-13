@@ -141,4 +141,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("org.robolectric:robolectric:4.12.2")
     testImplementation("androidx.test:core:1.6.1")
+
+    // TFLite for on-device ML model inference
+    implementation("org.tensorflow:tensorflow-lite:2.15.0")
 }

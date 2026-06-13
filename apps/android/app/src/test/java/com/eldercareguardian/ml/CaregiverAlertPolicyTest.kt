@@ -7,6 +7,7 @@ import com.eldercareguardian.data.PostureStatus
 import com.eldercareguardian.data.RiskStatus
 import com.eldercareguardian.data.SensorFrame
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -27,6 +28,11 @@ import org.junit.Test
  * For the new comprehensive Phase 7 tests, see CaregiverAlertPolicyPhase7Test.kt.
  */
 class CaregiverAlertPolicyTest {
+
+    @Before
+    fun setUp() {
+        CaregiverAlertPolicy.reset()
+    }
 
     private fun baseFrame(
         heartRateBpm: Int = 75,
@@ -82,7 +88,9 @@ class CaregiverAlertPolicyTest {
 
     @Test
     fun `SpO2 below 90 returns Emergency`() {
-        assertEquals(CaregiverAlertStatus.Emergency, CaregiverAlertPolicy.evaluate(baseFrame(spo2Percent = 88f)))
+        val lowSpo2 = baseFrame(spo2Percent = 88f)
+        repeat(3) { CaregiverAlertPolicy.evaluate(lowSpo2) }
+        assertEquals(CaregiverAlertStatus.Emergency, CaregiverAlertPolicy.evaluate(lowSpo2))
     }
 
     @Test
@@ -129,7 +137,9 @@ class CaregiverAlertPolicyTest {
 
     @Test
     fun `SpO2 90 to 94 returns Warning`() {
-        assertEquals(CaregiverAlertStatus.Warning, CaregiverAlertPolicy.evaluate(baseFrame(spo2Percent = 92f)))
+        val lowSpo2 = baseFrame(spo2Percent = 92f)
+        repeat(3) { CaregiverAlertPolicy.evaluate(lowSpo2) }
+        assertEquals(CaregiverAlertStatus.Warning, CaregiverAlertPolicy.evaluate(lowSpo2))
     }
 
     @Test

@@ -28,6 +28,7 @@ import com.eldercareguardian.ble.SmartSuitBleTelemetry
 import com.eldercareguardian.samsung.SamsungHealthState
 import com.eldercareguardian.ui.components.ChecklistRow
 import com.eldercareguardian.ui.components.SectionTitle
+import com.eldercareguardian.ui.theme.AppColors
 import kotlin.math.sqrt
 
 @Composable
@@ -71,14 +72,14 @@ private fun ReadinessPanel(
     samsungState: SamsungHealthState,
 ) {
     Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SectionTitle("Showcase readiness")
@@ -106,20 +107,20 @@ private fun SamsungHealthPanel(
         SamsungHealthState.Error -> "Error"
     }
     val stateColor = when (samsungState) {
-        SamsungHealthState.Ready -> Color(0xFF0F766E)
-        SamsungHealthState.NeedsPermission, SamsungHealthState.Disabled -> Color(0xFFB45309)
-        SamsungHealthState.NeedsPartnerApproval -> Color(0xFFB45309)
-        else -> Color(0xFFB91C1C)
+        SamsungHealthState.Ready -> AppColors.success
+        SamsungHealthState.NeedsPermission, SamsungHealthState.Disabled -> AppColors.warning
+        SamsungHealthState.NeedsPartnerApproval -> AppColors.warning
+        else -> AppColors.danger
     }
     Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
@@ -130,9 +131,9 @@ private fun SamsungHealthPanel(
                 SectionTitle("Samsung Health")
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(stateColor.copy(alpha = 0.12f))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Text(
                         stateLabel,
@@ -144,7 +145,7 @@ private fun SamsungHealthPanel(
             }
             Text(
                 text = "Data SDK v1.1.0 is a local AAR \u2014 drop it into app/libs/ to activate. Writes happen on a 5 s cadence once permissions are granted in Samsung Health.",
-                color = Color(0xFF475569),
+                color = AppColors.textSecondary,
                 style = MaterialTheme.typography.bodySmall,
             )
             if (samsungState == SamsungHealthState.NeedsPermission ||
@@ -152,20 +153,20 @@ private fun SamsungHealthPanel(
             ) {
                 OutlinedButton(
                     onClick = onStartSamsung,
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(8.dp),
                 ) {
                     Text("Request permission")
                 }
             } else if (samsungState == SamsungHealthState.NeedsPartnerApproval) {
                 Text(
                     text = "Register at developer.samsung.com/health/data to obtain partner approval, then download the AAR.",
-                    color = Color(0xFFB45309),
+                    color = AppColors.warning,
                     style = MaterialTheme.typography.bodySmall,
                 )
             } else if (samsungState == SamsungHealthState.NeedsSdkAar) {
                 Text(
                     text = "Add health-data-api-1.1.0.aar to apps/android/app/libs/ to enable this section.",
-                    color = Color(0xFFB45309),
+                    color = AppColors.warning,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -187,14 +188,14 @@ private fun BleConnectionPanel(
     val permissionsReady = missingPermissions.isEmpty()
 
     Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
@@ -208,14 +209,13 @@ private fun BleConnectionPanel(
 
             Text(
                 text = "Scanner looks for ElderCare_v1. Sensor frames stay on simulator until firmware exposes the custom GATT stream.",
-                color = Color(0xFF64748B),
+                color = AppColors.textTertiary,
                 style = MaterialTheme.typography.bodySmall,
             )
             if (missingPermissions.any { it == "android.permission.ACCESS_BACKGROUND_LOCATION" }) {
                 Text(
-                    text = "Background location is required for BLE scanning when the app is in the background. " +
-                        "Grant it via Settings \u2192 Permissions if BLE disconnects when you leave the app.",
-                    color = Color(0xFFB45309),
+                    text = "Background location is required for BLE scanning when the app is in the background. Grant it via Settings \u2192 Permissions if BLE disconnects when you leave the app.",
+                    color = AppColors.warning,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -223,20 +223,20 @@ private fun BleConnectionPanel(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = if (permissionsReady) onStartBleScan else onRequestPermissions,
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(8.dp),
                 ) {
                     Text(if (permissionsReady) "Scan" else "Grant")
                 }
                 OutlinedButton(
                     onClick = onStopBle,
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(8.dp),
                     enabled = bleConnectionState != BleConnectionState.Idle,
                 ) {
                     Text("Stop")
                 }
                 OutlinedButton(
                     onClick = onConnectFirstDevice,
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(8.dp),
                     enabled = permissionsReady && discoveredDevices.isNotEmpty(),
                 ) {
                     Text("Connect")
@@ -246,7 +246,7 @@ private fun BleConnectionPanel(
             if (discoveredDevices.isEmpty()) {
                 Text(
                     text = "No ElderCare_v1 advertisements yet.",
-                    color = Color(0xFF94A3B8),
+                    color = AppColors.textTertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
             } else {
@@ -255,7 +255,7 @@ private fun BleConnectionPanel(
                 }
             }
 
-            HorizontalDivider(color = Color(0xFFE2E8F0))
+            HorizontalDivider(color = AppColors.borderLight)
             BleTelemetrySummary(bleTelemetry)
         }
     }
@@ -294,30 +294,30 @@ private fun BleTelemetrySummary(telemetry: SmartSuitBleTelemetry) {
 private fun TelemetryChip(label: String, value: String, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFFF8FAFC))
+            .clip(RoundedCornerShape(8.dp))
+            .background(AppColors.surfaceTertiary)
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(label, color = Color(0xFF64748B), style = MaterialTheme.typography.labelSmall)
-        Text(value, color = Color(0xFF0F172A), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        Text(label, color = AppColors.textSecondary, style = MaterialTheme.typography.labelSmall)
+        Text(value, color = AppColors.textPrimary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
 }
 
 @Composable
 private fun BleStatePill(state: BleConnectionState) {
     val color = when (state) {
-        BleConnectionState.Connected -> Color(0xFF0F766E)
+        BleConnectionState.Connected -> AppColors.success
         BleConnectionState.Scanning, BleConnectionState.Connecting -> Color(0xFF2563EB)
-        BleConnectionState.Error, BleConnectionState.Unsupported, BleConnectionState.PermissionMissing -> Color(0xFFB91C1C)
-        else -> Color(0xFF64748B)
+        BleConnectionState.Error, BleConnectionState.Unsupported, BleConnectionState.PermissionMissing -> AppColors.danger
+        else -> AppColors.textTertiary
     }
 
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(color.copy(alpha = 0.12f))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(state.name, color = color, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
@@ -329,37 +329,37 @@ private fun DeviceRow(device: DiscoveredBleDevice) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFFF8FAFC))
+            .clip(RoundedCornerShape(8.dp))
+            .background(AppColors.surfaceSecondary)
             .padding(10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(device.name, color = Color(0xFF0F172A), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-            Text(device.address, color = Color(0xFF64748B), style = MaterialTheme.typography.bodySmall)
+            Text(device.name, color = AppColors.textPrimary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Text(device.address, color = AppColors.textTertiary, style = MaterialTheme.typography.bodySmall)
         }
-        Text("${device.rssi} dBm", color = Color(0xFF475569), style = MaterialTheme.typography.labelMedium)
+        Text("${device.rssi} dBm", color = AppColors.textSecondary, style = MaterialTheme.typography.labelMedium)
     }
 }
 
 @Composable
 private fun DeploymentPanel() {
     Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             SectionTitle("Samsung deployment")
             Text(
                 text = "Phase 1 is local dashboard and BLE. Phase 2 enables Samsung Health Data SDK on a real Samsung phone after AAR install and consent setup.",
-                color = Color(0xFF475569),
+                color = AppColors.textSecondary,
                 style = MaterialTheme.typography.bodyMedium,
             )
         }

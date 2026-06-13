@@ -1,0 +1,10 @@
+torch>=2.0
+numpy>=1.24
+pandas>=2.0
+scikit-learn>=1.2
+gdown>=5.0
+tqdm>=4.65
+onnx>=1.14
+onnx2tf>=1.16
+tensorflow>=2.13
+tf-keras>=2.13
