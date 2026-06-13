@@ -23,6 +23,3 @@ ml/data/
 *.npy
 *.zip
 
-# Android build artifacts
-apps/android/app/build/
-*.apk
