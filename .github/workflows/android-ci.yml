@@ -32,14 +32,25 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # Fix ❶: Accept SDK licenses before sdkmanager install
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+
       - name: Install Android platform 35
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
+      # Fix ❷: Let gradle-wrapper.properties control the version
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.10.2'
           cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
+
+      # Fix ❸: Write google-services.json from secret
+      - name: Write google-services.json
+        working-directory: apps/android/app
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" > google-services.json
 
       - name: Build debug APK
         working-directory: apps/android
@@ -85,37 +96,41 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # Fix ❶: Accept SDK licenses before sdkmanager install
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+
       - name: Install Android platform 35
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
+      # Fix ❷: Let gradle-wrapper.properties control the version
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.10.2'
           cache-read-only: true
 
+      # Fix ❸: Write google-services.json from secret
+      - name: Write google-services.json
+        working-directory: apps/android/app
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" > google-services.json
+
+      # Fix ❹: Decode keystore to $RUNNER_TEMP and export KEYSTORE_PATH env var
+      #         build.gradle.kts reads KEYSTORE_PATH directly — no keystore.properties needed
       - name: Decode keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > apps/android/eldercare-release.jks
+          echo "$KEYSTORE_BASE64" | base64 -d > $RUNNER_TEMP/eldercare-release.jks
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/eldercare-release.jks" >> $GITHUB_ENV
 
-      - name: Create keystore.properties
+      - name: Build signed release AAB
         working-directory: apps/android
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          cat > keystore.properties <<EOF
-          storeFile=../eldercare-release.jks
-          storePassword=$KEYSTORE_PASSWORD
-          keyAlias=$KEY_ALIAS
-          keyPassword=$KEY_PASSWORD
-          EOF
-
-      - name: Build signed release AAB
-        working-directory: apps/android
         run: ./gradlew bundleRelease --no-daemon --stacktrace
 
       - name: Upload signed AAB
