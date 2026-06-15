@@ -2,7 +2,9 @@ package com.eldercareguardian.ui
 
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
+import com.eldercareguardian.database.DatabaseEncryption
 import org.junit.Assert.assertEquals
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -14,6 +16,7 @@ class SmartSuitViewModelTest {
 
     @Test
     fun `triggerSosDemo does not change acknowledgedUrgent`() {
+        assumeTrue("SQLCipher native library is unavailable in this environment", DatabaseEncryption.isSqlCipherAvailable())
         val viewModel = SmartSuitViewModel(ApplicationProvider.getApplicationContext())
         assertEquals(false, viewModel.acknowledgedUrgent.value)
         viewModel.triggerSosDemo()
@@ -22,6 +25,7 @@ class SmartSuitViewModelTest {
 
     @Test
     fun `clearSosDemo does not affect acknowledgedUrgent`() {
+        assumeTrue("SQLCipher native library is unavailable in this environment", DatabaseEncryption.isSqlCipherAvailable())
         val viewModel = SmartSuitViewModel(ApplicationProvider.getApplicationContext())
         assertEquals(false, viewModel.acknowledgedUrgent.value)
         viewModel.clearSosDemo()
