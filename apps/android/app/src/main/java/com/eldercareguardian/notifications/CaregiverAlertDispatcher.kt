@@ -26,6 +26,12 @@ import com.eldercareguardian.data.CaregiverAlertStatus
  * not suitable for all markets without explicit user consent. The current
  * implementation uses ACTION_DIAL (no permission needed) which pre-fills
  * the number but requires user confirmation to place the call.
+ *
+ * Security hardening (Session 16):
+ *  - SMS body no longer includes GPS coordinates (PHI leak over unencrypted
+ *    carrier network). Location detail is available in-app only.
+ *  - Alert reason is genericized to a category label rather than raw sensor
+ *    values to minimize PHI exposure.
  */
 object CaregiverAlertDispatcher {
 
@@ -36,7 +42,7 @@ object CaregiverAlertDispatcher {
      * @param level       The alert level to dispatch.
      * @param reason      Human-readable reason for the alert (e.g. "SOS pressed").
      * @param caregiverPhone  Caregiver phone number in E.164 format.
-     * @param location    Optional GPS location to include in SMS.
+     * @param location    Optional GPS location (used for in-app display only, NOT sent via SMS).
      * @param enableSms   Set to true when SEND_SMS permission is granted.
      */
     fun dispatch(
@@ -56,7 +62,7 @@ object CaregiverAlertDispatcher {
                 if (enableSms && caregiverPhone.isNotBlank()) {
                     sendSms(
                         phone = caregiverPhone,
-                        message = buildSmsMessage(level, reason, location),
+                        message = buildSmsMessage(level, reason),
                     )
                 }
             }
@@ -64,7 +70,7 @@ object CaregiverAlertDispatcher {
                 if (enableSms && caregiverPhone.isNotBlank()) {
                     sendSms(
                         phone = caregiverPhone,
-                        message = buildSmsMessage(level, reason, location),
+                        message = buildSmsMessage(level, reason),
                     )
                 }
                 // Emergency: prompt the caregiver to call — handled by ViewModel via buildCaregiverDialIntent()
@@ -72,26 +78,48 @@ object CaregiverAlertDispatcher {
         }
     }
 
+    /**
+     * Builds a PHI-safe SMS message.
+     *
+     * - NO GPS coordinates (SMS travels unencrypted over carrier network).
+     * - Reason is genericized to a category label to minimize PHI.
+     * - Full detail (location, raw vitals) is available in the app notification.
+     */
     fun buildSmsMessage(
         level: CaregiverAlertStatus,
         reason: String,
-        location: Location?,
     ): String {
         val levelTag = when (level) {
             CaregiverAlertStatus.Warning -> "⚠️ WARNING"
             CaregiverAlertStatus.Emergency -> "🚨 EMERGENCY"
             else -> "ℹ️ CHECK"
         }
-        val locationStr = if (location != null) {
-            "\nLocation: https://maps.google.com/?q=${location.latitude},${location.longitude}"
-        } else {
-            "\nLocation: unavailable"
-        }
+        // Genericize the reason to a safe category label.
+        val safeReason = sanitizeReason(reason)
         return buildString {
             append("ElderCare Guardian — $levelTag\n")
-            append("Reason: $reason\n")
-            append(locationStr)
-            append("\nPlease check on your patient immediately.")
+            append("Alert: $safeReason\n")
+            append("Please open the app for details.")
+        }
+    }
+
+    /**
+     * Maps raw alert reasons to safe category labels that don't contain PHI.
+     * Raw sensor values, coordinates, and patient-specific info are stripped.
+     */
+    private fun sanitizeReason(reason: String): String {
+        val lower = reason.lowercase()
+        return when {
+            lower.contains("sos") -> "SOS activated"
+            lower.contains("fall") -> "Fall detected"
+            lower.contains("heart") || lower.contains("hr") || lower.contains("bpm") -> "Vitals alert"
+            lower.contains("spo2") || lower.contains("oxygen") -> "Vitals alert"
+            lower.contains("ecg") || lower.contains("afib") -> "Vitals alert"
+            lower.contains("inactiv") -> "Inactivity alert"
+            lower.contains("dehydra") -> "Wellness alert"
+            lower.contains("fatigue") || lower.contains("exert") -> "Wellness alert"
+            lower.contains("battery") -> "Device alert"
+            else -> "Health alert"
         }
     }
 

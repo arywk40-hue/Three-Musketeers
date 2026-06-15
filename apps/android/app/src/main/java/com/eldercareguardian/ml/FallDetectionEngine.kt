@@ -75,6 +75,7 @@ object FallDetectionEngine {
      * Call this once per BLE notification (~1 Hz) or at sensor sample rate.
      * The function maintains state internally in the circular window.
      */
+    @Synchronized
     fun assess(imuWindow: List<Float>): FallAssessment {
         if (imuWindow.size < 3) return FallAssessment(RiskStatus.Low, 0f, 9.81f)
 
@@ -144,6 +145,7 @@ object FallDetectionEngine {
     }
 
     /** Reset all internal state. Call when disconnecting from sensor. */
+    @Synchronized
     fun reset() {
         magnitudeWindow.clear()
         spikeDetected = false

@@ -3,6 +3,7 @@ package com.eldercareguardian.data
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.core.content.FileProvider
 import com.eldercareguardian.database.AlertEventEntity
 import com.eldercareguardian.database.HealthDataEntity
@@ -20,8 +21,19 @@ data class ExportPackage(
     val alertEvents: List<AlertEventEntity>,
 )
 
+/**
+ * Exports patient data as JSON for sharing / backup.
+ *
+ * Security hardening (Session 16):
+ *  - Export files are now written to app-private [Context.getFilesDir] instead
+ *    of [Context.getCacheDir] which may be accessible to other apps on
+ *    rooted devices or via backup extraction.
+ *  - Added [cleanup] method to delete export files after sharing.
+ */
 object DataExporter {
 
+    private const val TAG = "DataExporter"
+    private const val EXPORT_DIR = "exports"
     private val gson = GsonBuilder().setPrettyPrinting().create()
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US)
 
@@ -39,10 +51,19 @@ object DataExporter {
             alertEvents = alertEvents,
         )
         val json = gson.toJson(export)
-        val dir = File(context.cacheDir, "exports")
+
+        // Write to app-private storage (not cacheDir) for better security
+        val dir = File(context.filesDir, EXPORT_DIR)
         dir.mkdirs()
         val file = File(dir, "eldercare_export_$timestamp.json")
         file.writeText(json)
+
+        // Restrict file permissions to owner only
+        file.setReadable(false, false)
+        file.setWritable(false, false)
+        file.setReadable(true, true)
+        file.setWritable(true, true)
+
         return file
     }
 
@@ -56,6 +77,30 @@ object DataExporter {
             type = "application/json"
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+
+    /**
+     * Deletes all export files from the exports directory.
+     * Call this after the share intent completes to avoid leaving PHI on disk.
+     */
+    fun cleanup(context: Context) {
+        val dir = File(context.filesDir, EXPORT_DIR)
+        if (dir.exists()) {
+            dir.listFiles()?.forEach { file ->
+                if (file.delete()) {
+                    Log.d(TAG, "Cleaned up export: ${file.name}")
+                }
+            }
+        }
+    }
+
+    /**
+     * Deletes a specific export file.
+     */
+    fun cleanup(file: File) {
+        if (file.exists() && file.delete()) {
+            Log.d(TAG, "Cleaned up export: ${file.name}")
         }
     }
 }

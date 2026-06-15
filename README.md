@@ -3,7 +3,7 @@
 
 **Team:** Pranay · Ariyan · Reman Dey  
 **Institution:** IIT Mandi  
-**Version:** 1.0.0-beta — Pre-Release  
+**Version:** 1.0.0-beta — Pre
 **Date:** June 2026
 
 ---

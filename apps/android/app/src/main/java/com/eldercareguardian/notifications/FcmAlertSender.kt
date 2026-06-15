@@ -3,10 +3,18 @@ package com.eldercareguardian.notifications
 import com.eldercareguardian.data.CaregiverAlertStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
+/**
+ * Sends caregiver alerts to the FCM backend.
+ *
+ * Security hardening (Session 16):
+ *  - Replaced manual `buildString` JSON construction with [JSONObject]
+ *    which properly escapes all values, preventing JSON injection.
+ */
 object FcmAlertSender {
 
     suspend fun sendAlert(
@@ -29,19 +37,16 @@ object FcmAlertSender {
             conn.connectTimeout = 5_000
             conn.readTimeout = 5_000
 
-            val body = buildString {
-                append("{\"token\":\"")
-                append(caregiverFcmToken)
-                append("\",\"level\":\"")
-                append(level.name)
-                append("\",\"reason\":\"")
-                append(reason.replace("\"", "\\\""))
-                append("\",\"patientName\":\"")
-                append(patientName.replace("\"", "\\\""))
-                append("\"}")
+            // JSONObject.put() automatically escapes special characters,
+            // preventing injection attacks from crafted reason/patientName values.
+            val body = JSONObject().apply {
+                put("token", caregiverFcmToken)
+                put("level", level.name)
+                put("reason", reason)
+                put("patientName", patientName)
             }
 
-            OutputStreamWriter(conn.outputStream).use { it.write(body) }
+            OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
 
             val code = conn.responseCode
             if (code in 200..299) {

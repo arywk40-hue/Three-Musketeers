@@ -41,6 +41,11 @@
 
 # ── Security ──
 -keep class androidx.security.crypto.** { *; }
+-keep class com.eldercareguardian.database.DatabaseEncryption { *; }
+-keep class com.eldercareguardian.notifications.FcmTokenManager { *; }
+# Tink crypto primitives used by EncryptedSharedPreferences
+-keep class com.google.crypto.tink.** { *; }
+-dontwarn com.google.crypto.tink.**
 
 # ── Samsung Health SDK ──
 -keep class com.samsung.android.sdk.** { *; }

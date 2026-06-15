@@ -52,6 +52,7 @@ object CaregiverAlertPolicy {
     private const val SPO2_DEBOUNCE_THRESHOLD = 3
     private var consecutiveLowSpo2 = 0
 
+    @Synchronized
     fun evaluate(frame: SensorFrame): CaregiverAlertStatus {
         // SpO2 debounce: track consecutive low readings
         if (frame.spo2Percent < 96f) {
@@ -68,6 +69,7 @@ object CaregiverAlertPolicy {
         }
     }
 
+    @Synchronized
     fun reset() {
         consecutiveLowSpo2 = 0
     }
