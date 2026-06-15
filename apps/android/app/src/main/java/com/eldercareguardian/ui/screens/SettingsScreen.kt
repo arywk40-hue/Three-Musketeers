@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -645,7 +646,7 @@ private fun DataRetentionSection(
                             containerColor = if (selected) Color(0xFF0F766E) else Color.Transparent,
                             contentColor = if (selected) Color.White else Color(0xFF334155),
                         ),
-                        border = if (selected) null else null,
+                        border = if (selected) null else BorderStroke(1.dp, Color(0xFFE2E8F0)),
                         modifier = Modifier.weight(1f).height(36.dp),
                     ) {
                         Text(

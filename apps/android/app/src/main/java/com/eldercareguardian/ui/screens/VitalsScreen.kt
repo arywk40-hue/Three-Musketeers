@@ -247,7 +247,7 @@ private fun MetricGrid(frame: SensorFrame) {
                     unit = if (frame.bpEstimated) "est mmHg" else "mmHg",
                     modifier = Modifier.weight(1f),
                 )
-                MetricCard("Temp", "%.1f".format(frame.skinTempC), "C", Modifier.weight(1f))
+                MetricCard("Temp", "%.1f".format(frame.skinTempC), "°C", Modifier.weight(1f))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 MetricCard("Resp", "${frame.respiratoryRate}", "/min", Modifier.weight(1f))

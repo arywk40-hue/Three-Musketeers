@@ -25,7 +25,7 @@ fun MetricCard(
     value: String,
     unit: String,
     modifier: Modifier = Modifier,
-    accentColor: Color = AppColors.primary,
+    accentColor: Color = AppColors.textPrimary,
 ) {
     Card(
         modifier = modifier.height(92.dp),
@@ -49,7 +49,7 @@ fun MetricCard(
                     text = value,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = AppColors.textPrimary,
+                    color = accentColor,
                 )
                 Text(
                     text = " $unit",

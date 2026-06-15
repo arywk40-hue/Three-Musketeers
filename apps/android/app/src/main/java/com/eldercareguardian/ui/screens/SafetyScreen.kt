@@ -81,7 +81,7 @@ private fun SafetyPanel(
                     RiskStatus.Medium -> AppColors.warning
                     RiskStatus.Low -> AppColors.primary
                 }
-                MetricCard("Fall risk", frame.fallRisk.name, "", Modifier.weight(1f))
+                MetricCard("Fall risk", frame.fallRisk.name, "", Modifier.weight(1f), accentColor = fallSeverity)
                 MetricCard("SOS", if (frame.sosActive) "Active" else "Off", "", Modifier.weight(1f))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

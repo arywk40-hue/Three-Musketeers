@@ -11,6 +11,7 @@ import com.eldercareguardian.ml.HeartRateExtractor
 import com.eldercareguardian.ml.InactivityMonitor
 import com.eldercareguardian.ml.OverexertionModel
 import com.eldercareguardian.ml.VitalsRiskMonitor
+import kotlin.math.abs
 import kotlin.math.sqrt
 
 object SensorFrameMerger {
@@ -74,6 +75,12 @@ object SensorFrameMerger {
             RiskStatus.Low -> base.posture
         }
 
+        val spo2Quality = when {
+            ble.spo2Percent == null -> Spo2Quality.NoSignal
+            abs(imuMagnitude - 9.81f) > 3.0f -> Spo2Quality.Unreliable
+            else -> Spo2Quality.Reliable
+        }
+
         val merged = base.copy(
             heartRateBpm = heartRateBpm,
             spo2Percent = spo2Percent,
@@ -92,6 +99,7 @@ object SensorFrameMerger {
             imuMagnitude = imuMagnitude,
             hrReservePercent = overexertion.hrReservePercent,
             batteryPercent = ble.batteryPercent ?: base.batteryPercent,
+            spo2Quality = spo2Quality,
         )
 
         val alert = CaregiverAlertPolicy.evaluate(merged)
