@@ -14,6 +14,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,7 +46,7 @@ fun CaregiverScreen(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        CaregiverPanel(frame, caregiverDisplayName, caregiverPhoneNumber, onCallCaregiver)
+        CaregiverPanel(frame, caregiverDisplayName, caregiverPhoneNumber, onCallCaregiver, alertHistory)
         DailyStatusPanel(frame)
         AlertTimeline(events = alertHistory)
     }
@@ -57,6 +58,7 @@ private fun CaregiverPanel(
     caregiverDisplayName: String,
     caregiverPhoneNumber: String,
     onCallCaregiver: () -> Unit,
+    alertHistory: List<AlertEvent>,
 ) {
     Card(
         shape = RoundedCornerShape(10.dp),
@@ -70,9 +72,30 @@ private fun CaregiverPanel(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SectionTitle("Caregiver alert")
+            val lastAlertText = remember(alertHistory, frame) {
+                val first = alertHistory.firstOrNull()
+                if (first == null) {
+                    "None yet"
+                } else {
+                    val diffMs = System.currentTimeMillis() - first.timestampMillis
+                    val diffMin = diffMs / 60000L
+                    val diffHrs = diffMin / 60L
+                    when {
+                        diffMin < 1 -> "Just now"
+                        diffMin < 60 -> "${diffMin}m ago"
+                        else -> "${diffHrs}h ago"
+                    }
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                MetricCard("Status", frame.caregiverAlert.name, "", Modifier.weight(1f))
-                MetricCard("Check-in", if (frame.sosActive) "Needed" else "OK", "", Modifier.weight(1f))
+                MetricCard(
+                    label = "Status",
+                    value = frame.caregiverAlert.name,
+                    unit = "",
+                    modifier = Modifier.weight(1f),
+                    accentColor = AppColors.colorForAlert(frame.caregiverAlert)
+                )
+                MetricCard("Last alert", lastAlertText, "", Modifier.weight(1f))
             }
             StatusPill(label = frame.caregiverAlert.name, status = PillStatus.CaregiverAlert(frame.caregiverAlert))
             HorizontalDivider(color = AppColors.borderLight)

@@ -85,7 +85,7 @@ fun VitalsScreen(
 private fun EcgPanel(samples: List<Float>) {
     Card(
         shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E)),
+        colors = CardDefaults.cardColors(containerColor = AppColors.monitorBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
@@ -103,13 +103,13 @@ private fun EcgPanel(samples: List<Float>) {
                     text = "ECG",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF94A3B8),
+                    color = AppColors.monitorLabel,
                 )
                 Box(
                     modifier = Modifier
                         .size(6.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF22C55E)),
+                        .background(AppColors.monitorTrace),
                 )
             }
             Canvas(
@@ -117,7 +117,7 @@ private fun EcgPanel(samples: List<Float>) {
                     .fillMaxWidth()
                     .height(140.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF0F0F23)),
+                    .background(AppColors.monitorScreen),
             ) {
                 if (samples.size > 1) {
                     val step = size.width / (samples.lastIndex).coerceAtLeast(1)
@@ -128,7 +128,7 @@ private fun EcgPanel(samples: List<Float>) {
                         val point = Offset(index * step, middle - value * scale)
                         if (index == 0) path.moveTo(point.x, point.y) else path.lineTo(point.x, point.y)
                     }
-                    drawPath(path, color = Color(0xFF22C55E), style = Stroke(width = 3f))
+                    drawPath(path, color = AppColors.monitorTrace, style = Stroke(width = 3f))
                 }
             }
         }

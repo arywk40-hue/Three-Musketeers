@@ -1,6 +1,7 @@
 package com.eldercareguardian.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import com.eldercareguardian.data.CaregiverAlertStatus
 
 object AppColors {
     val background = Color(0xFFF0F4F8)
@@ -27,6 +28,18 @@ object AppColors {
     val border = Color(0xFFE2E8F0)
     val borderLight = Color(0xFFF1F5F9)
 
+    val monitorBackground = Color(0xFF1A1A2E)
+    val monitorScreen = Color(0xFF0F0F23)
+    val monitorLabel = Color(0xFF94A3B8)
+    val monitorTrace = Color(0xFF22C55E)
+
+    fun colorForAlert(status: CaregiverAlertStatus): Color = when (status) {
+        CaregiverAlertStatus.Emergency -> danger
+        CaregiverAlertStatus.Warning -> warning
+        CaregiverAlertStatus.Check -> warning
+        CaregiverAlertStatus.Normal -> primary
+    }
+
     fun severityColor(
         isWarning: Boolean = false,
         isDanger: Boolean = false,
@@ -42,3 +55,4 @@ object AppColors {
         else -> primary
     }
 }
+

@@ -32,12 +32,7 @@ sealed interface PillStatus {
 }
 
 private fun colorFor(status: PillStatus): Color = when (status) {
-    is PillStatus.CaregiverAlert -> when (status.level) {
-        CaregiverAlertStatus.Emergency -> AppColors.danger
-        CaregiverAlertStatus.Warning -> AppColors.warning
-        CaregiverAlertStatus.Check -> AppColors.warning
-        CaregiverAlertStatus.Normal -> AppColors.primary
-    }
+    is PillStatus.CaregiverAlert -> AppColors.colorForAlert(status.level)
     is PillStatus.Posture -> when (status.status) {
         PostureStatus.Bad -> AppColors.danger
         PostureStatus.Warning -> AppColors.warning

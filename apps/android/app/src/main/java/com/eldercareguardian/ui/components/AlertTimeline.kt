@@ -75,7 +75,7 @@ private fun AlertTimelineRow(event: AlertEvent) {
         CaregiverAlertStatus.Check -> AppColors.warning
         CaregiverAlertStatus.Normal -> AppColors.primary
     }
-    val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
+    val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
