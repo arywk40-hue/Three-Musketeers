@@ -5,6 +5,9 @@ build/
 .gradle/
 .kotlin/
 
+# Gradle wrapper extracted distribution (auto-downloaded by ./gradlew)
+wrapper/dists/
+
 # IDE
 .idea/
 *.iml
