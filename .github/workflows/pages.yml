@@ -25,12 +25,33 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      # Stage only the static content — exclude the Android project,
+      # backend, preview, etc. from the Pages artifact.
+      - name: Prepare Pages content
+        run: |
+          mkdir -p _site/tos _site/privacy-policy
+          cp apps/tos/index.html _site/tos/index.html
+          cp apps/privacy-policy/index.html _site/privacy-policy/index.html
+          # Root index that redirects to ToS
+          cat > _site/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html><head>
+            <meta http-equiv="refresh" content="0;url=tos/">
+            <title>ElderCare Guardian</title>
+          </head><body>
+            <p><a href="tos/">Terms of Service</a> | <a href="privacy-policy/">Privacy Policy</a></p>
+          </body></html>
+          EOF
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: apps
+          path: _site
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
