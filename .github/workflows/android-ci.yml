@@ -32,25 +32,37 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # Fix ❶: Accept SDK licenses before sdkmanager install
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses
 
       - name: Install Android platform 35
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      # Fix ❷: Let gradle-wrapper.properties control the version
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
 
-      # Fix ❸: Write google-services.json from secret
+      # Write google-services.json from secret, or generate a valid dummy
+      # so Firebase SDK initializes without crashing the build.
+      # The google-services plugin is declared in root build.gradle.kts
+      # but not applied at app level, so Firebase reads this at runtime only.
       - name: Write google-services.json
         working-directory: apps/android/app
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: echo "$GOOGLE_SERVICES_JSON" > google-services.json
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" > google-services.json
+          else
+            cat > google-services.json << 'DUMMY'
+          {
+            "project_info": { "project_number": "000000000000", "project_id": "eldercare-ci-dummy", "storage_bucket": "eldercare-ci-dummy.appspot.com" },
+            "client": [{ "client_info": { "mobilesdk_app_id": "1:000000000000:android:0000000000000000", "android_client_info": { "package_name": "com.eldercareguardian" } }, "api_key": [{ "current_key": "CI_DUMMY_KEY" }] }],
+            "configuration_version": "1"
+          }
+          DUMMY
+          fi
 
       - name: Build debug APK
         working-directory: apps/android
@@ -69,6 +81,7 @@ jobs:
           retention-days: 7
 
       - name: Upload test report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-report
@@ -96,34 +109,42 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # Fix ❶: Accept SDK licenses before sdkmanager install
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses
 
       - name: Install Android platform 35
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      # Fix ❷: Let gradle-wrapper.properties control the version
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: true
 
-      # Fix ❸: Write google-services.json from secret
       - name: Write google-services.json
         working-directory: apps/android/app
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: echo "$GOOGLE_SERVICES_JSON" > google-services.json
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" > google-services.json
+          else
+            cat > google-services.json << 'DUMMY'
+          {
+            "project_info": { "project_number": "000000000000", "project_id": "eldercare-ci-dummy", "storage_bucket": "eldercare-ci-dummy.appspot.com" },
+            "client": [{ "client_info": { "mobilesdk_app_id": "1:000000000000:android:0000000000000000", "android_client_info": { "package_name": "com.eldercareguardian" } }, "api_key": [{ "current_key": "CI_DUMMY_KEY" }] }],
+            "configuration_version": "1"
+          }
+          DUMMY
+          fi
 
-      # Fix ❹: Decode keystore to $RUNNER_TEMP and export KEYSTORE_PATH env var
-      #         build.gradle.kts reads KEYSTORE_PATH directly — no keystore.properties needed
       - name: Decode keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > $RUNNER_TEMP/eldercare-release.jks
-          echo "KEYSTORE_PATH=$RUNNER_TEMP/eldercare-release.jks" >> $GITHUB_ENV
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > $RUNNER_TEMP/eldercare-release.jks
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/eldercare-release.jks" >> $GITHUB_ENV
+          fi
 
       - name: Build signed release AAB
         working-directory: apps/android
