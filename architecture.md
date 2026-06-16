@@ -179,38 +179,24 @@ Custom vendor service (UUID: `12345678-1234-5678-1234-567812345678`):
 ### Module breakdown
 
 ```
-Android App
-├── BLEManager
-│   ├── scan for "ElderCare_v1"
-│   ├── GATT connect + MTU negotiate (512 bytes for ECG window)
-│   ├── subscribe all characteristic notifications
-│   ├── parse SIG PLX Continuous (0x2A5F) → spo2Percent when MAX30102 Maxim algorithm fires
-│   └── parse binary frames → SensorFrame data class
-│
-├── SamsungHealthManager
-│   ├── HealthDataService DataStore bridge
-│   ├── write HR, SpO2, BP, Temp to Samsung Health (Data SDK local AAR)
-│   ├── read historical data for History screen
-│   └── handle consent permission flow (required by Samsung)
-│
-├── SafetyEngine (all rule-based; TFLite drop-in path reserved for each engine)
-│   ├── EcgAnomalyDetector.kt       R-peak → RR intervals → RMSSD: Normal/AFib/Tachy/Brady
-│   ├── HeartRateExtractor.kt       256 Hz peak detect + adaptive threshold + baseline removal
-│   ├── FallDetectionEngine.kt      IMU magnitude spike/stillness: Low/Medium/High
-│   ├── FallConfirmationBuffer.kt   2-frame spike+stillness confirmation window
-│   ├── InactivityMonitor.kt        |‖a‖ − 9.81| > 0.6 m/s² motion gate; seconds → minutes
-│   ├── DehydrationRiskModel.kt     Sweat rate + skin temp + HR: Low/Medium/High
-│   ├── OverexertionModel.kt        HR-reserve % + SpO2 drop + RR + IMU: Safe/Caution/Stop
-│   ├── BloodPressureEstimator.kt   HR + skin-temp linear model; isEstimated=true
-│   ├── VitalsRiskMonitor.kt        Composite 4-vital score: Low/Medium/High
-│   └── CaregiverAlertPolicy.kt     Triage: SOS/HR/SpO2/fall/ECG/vitals → Normal/Check/Warning/Emergency
-│
-└── UI (Jetpack Compose)
-    ├── VitalsScreen    — ECG waveform + HR, SpO2, RR cards
-    ├── SafetyScreen    — fall risk, SOS, inactivity, posture state
-    ├── CaregiverScreen — alert level, contact status, last check-in
-    └── ReadinessScreen — BLE, Samsung Health bridge, device battery
+app/src/main/java/com/eldercareguardian/
+├── ble/              # BLE scan, GATT client, frame parser, simulator
+├── consent/          # DpdpaConsentScreen, ConsentPreferences (DPDPA)   ← ADD
+├── data/             # Domain models, SensorFrameMerger, DataExporter, DataDeleter
+├── database/         # Room + SQLCipher, migrations 1→2→3
+├── ml/               # Rule engines: ECG, IMU, vitals, alert triage + TFLite scaffold
+├── notifications/    # FCM token, alert dispatcher, NotificationHelper
+├── permissions/      # SmartSuitPermissions (core/enhanced two-tier)    ← ADD
+├── samsung/          # Samsung Health reflection bridge
+├── service/          # ElderCareMonitorService (foreground BLE)          ← ADD
+├── settings/         # CaregiverPreferences, ActivePatientPreferences,
+│                     # DataRetentionPreferences                           ← ADD
+└── ui/               # Jetpack Compose screens + components + ViewModel
 ```
+
+> **Prototype vs. full-suit scope:** The architecture above describes the full three-IMU suit.
+> The current prototype implements a single wrist IMU (`IMU_WRIST`, `float32[6]`) over BLE.
+> The TCA9548A multiplexer and elbow/lumbar IMUs are deferred to the production PCB.
 
 ### Samsung Health Data SDK integration
 

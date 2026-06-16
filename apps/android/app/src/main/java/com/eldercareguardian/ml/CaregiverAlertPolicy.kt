@@ -94,7 +94,6 @@ object CaregiverAlertPolicy {
         if (frame.heartRateBpm < 50) return true
         if (frame.vitalsRisk == RiskStatus.High) return true
         if (frame.fallRisk == RiskStatus.Medium) return true
-        if (frame.fatigue == FatigueStatus.Stop) return true
         // Night-time: 5-minute inactivity threshold
         val nightThreshold = InactivityMonitor.NIGHT_INACTIVITY_THRESHOLD_MINUTES
         val isDaytime = currentHour in 6..21
@@ -111,6 +110,9 @@ object CaregiverAlertPolicy {
         // Day-time: 20-minute inactivity threshold
         val isDaytime = currentHour in 6..21
         if (isDaytime && frame.inactivityMinutes >= InactivityMonitor.DAY_INACTIVITY_THRESHOLD_MINUTES) return true
+        // Fatigue.Stop is a Check (not Warning) — overexertion model is a wellness indicator only
+        if (frame.fatigue == FatigueStatus.Stop) return true
+        // High perspiration is a hydration reminder only, never a Warning/Emergency
         if (frame.dehydration == RiskStatus.High) return true
         if (frame.batteryPercent != null && frame.batteryPercent < 15) return true
         if (frame.ecgAnomaly == EcgAnomalyStatus.Tachycardia) return true

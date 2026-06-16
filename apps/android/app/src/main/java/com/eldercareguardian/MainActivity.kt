@@ -20,24 +20,18 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val consentGranted by consentPreferences.isConsentGranted
-                .collectAsState(initial = null)
+                .collectAsState(initial = false)
 
-            // null = loading, false = not granted, true = granted
-            when (consentGranted) {
-                null -> {
-                    // Show nothing while DataStore loads (avoids flash)
-                }
-                false -> {
-                    DpdpaConsentScreen(
-                        consentPreferences = consentPreferences,
-                        onConsentGranted = {
-                            // Recomposition via the Flow handles the transition
-                        },
-                    )
-                }
-                true -> {
-                    SmartSuitApp()
-                }
+            // initial = false eliminates blank screen flash on cold start
+            if (consentGranted) {
+                SmartSuitApp()
+            } else {
+                DpdpaConsentScreen(
+                    consentPreferences = consentPreferences,
+                    onConsentGranted = {
+                        // Recomposition via the Flow handles the transition
+                    },
+                )
             }
         }
     }

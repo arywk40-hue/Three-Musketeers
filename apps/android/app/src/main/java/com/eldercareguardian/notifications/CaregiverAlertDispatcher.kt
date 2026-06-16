@@ -1,6 +1,7 @@
 package com.eldercareguardian.notifications
 
 import android.content.Context
+import android.os.Build
 import android.telephony.SmsManager
 import android.location.Location
 import com.eldercareguardian.data.CaregiverAlertStatus
@@ -61,6 +62,7 @@ object CaregiverAlertDispatcher {
             CaregiverAlertStatus.Warning -> {
                 if (enableSms && caregiverPhone.isNotBlank()) {
                     sendSms(
+                        context = context,
                         phone = caregiverPhone,
                         message = buildSmsMessage(level, reason),
                     )
@@ -69,6 +71,7 @@ object CaregiverAlertDispatcher {
             CaregiverAlertStatus.Emergency -> {
                 if (enableSms && caregiverPhone.isNotBlank()) {
                     sendSms(
+                        context = context,
                         phone = caregiverPhone,
                         message = buildSmsMessage(level, reason),
                     )
@@ -123,12 +126,15 @@ object CaregiverAlertDispatcher {
         }
     }
 
-    @Suppress("DEPRECATION")
-    private fun sendSms(phone: String, message: String) {
+    private fun sendSms(context: Context, phone: String, message: String) {
         try {
-            // SmsManager.getDefault() is deprecated in API 31+; use context-based approach in production.
-            val smsManager = SmsManager.getDefault()
-            // Split message if longer than 160 chars
+            val smsManager: SmsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                context.getSystemService(SmsManager::class.java)
+                    ?: return  // getSystemService can return null — guard it
+            } else {
+                @Suppress("DEPRECATION")
+                SmsManager.getDefault()
+            }
             val parts = smsManager.divideMessage(message)
             if (parts.size == 1) {
                 smsManager.sendTextMessage(phone, null, message, null, null)
@@ -136,7 +142,6 @@ object CaregiverAlertDispatcher {
                 smsManager.sendMultipartTextMessage(phone, null, parts, null, null)
             }
         } catch (e: Exception) {
-            // Log failure — do NOT crash the app on SMS failure
             android.util.Log.e("CaregiverAlertDispatcher", "SMS failed: ${e.message}")
         }
     }

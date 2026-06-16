@@ -10,6 +10,7 @@ import com.eldercareguardian.database.HealthDataEntity
 import com.eldercareguardian.database.PatientEntity
 import com.google.gson.GsonBuilder
 import java.io.File
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -54,9 +55,17 @@ object DataExporter {
 
         // Write to app-private storage (not cacheDir) for better security
         val dir = File(context.filesDir, EXPORT_DIR)
-        dir.mkdirs()
+        if (!dir.mkdirs() && !dir.exists()) {
+            throw IOException("Failed to create export directory: ${dir.absolutePath}")
+        }
+
         val file = File(dir, "eldercare_export_$timestamp.json")
-        file.writeText(json)
+        try {
+            file.writeText(json)
+        } catch (e: IOException) {
+            Log.e(TAG, "Export write failed: ${e.message}")
+            throw IOException("Export failed — check device storage: ${e.message}", e)
+        }
 
         // Restrict file permissions to owner only
         file.setReadable(false, false)

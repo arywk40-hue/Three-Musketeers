@@ -1,101 +1,56 @@
-# Fall Detection Calibration
+# Fall Detection Calibration Report
 
-## Overview
-
-`FallDetectionEngine` uses a three-phase temporal-window algorithm to detect falls from wrist-mounted IMU acceleration data. The thresholds were initially chosen from published literature (Bourke & Lyons 2008). This document tracks calibration results from the SisFall dataset.
-
-> **Status:** Calibration harness built. SisFall dataset must be downloaded separately (research access required) and run through `docs/sisfall-validation/validate_fall_engine.py` to produce the threshold validation matrix below.
-
-## Current Thresholds (Literature-Based)
-
-| Constant | Value | Source |
-|---|---|---|
-| `FALL_SPIKE_THRESHOLD` | 19.6 m/s² (2g) | Bourke & Lyons 2008 — wrist-mounted impact threshold |
-| `FALL_STILLNESS_THRESHOLD` | 4.0 m/s² | Post-fall body movement allowance (breathing, tremor) |
-| `SPIKE_MIN_SAMPLES` | 2 | Minimum consecutive samples to confirm impact |
-| `STILLNESS_MIN_SAMPLES` | 3 | Minimum consecutive still samples to confirm fall |
-| `SPIKE_TO_STILLNESS_WINDOW_SAMPLES` | 5 | Samples after spike to observe stillness (~5 s at 1 Hz) |
-
-## SisFall Dataset
-
-The [SisFall](https://www.researchgate.net/publication/276271186_SisFall_Dataset) dataset contains:
-
-- **38 subjects** (19 young adults, 19 elderly)
-- **19 ADL activities** (A01–A19): walking, sitting, standing, stairs, etc.
-- **15 fall types** (D01–D15): forward, backward, lateral, slip, trip, syncope, etc.
-- **Sampling:** 200 Hz from ADXL345 triple-axis accelerometer (±16g)
-- **Sensor placement:** Waist-mounted (closest available surrogate for our wrist-worn sensor)
-
-## Validation Runner
-
-```bash
-python3 docs/sisfall-validation/validate_fall_engine.py \
-    --data-dir /path/to/SisFall \
-    --out docs/fall-detection-calibration.md
-```
-
-See [docs/sisfall-validation/README.md](sisfall-validation/README.md) for detailed usage.
+**Generated:** 2026-06-16 16:55
+**Dataset:** SisFall (ml/data/SisFall/content/gdrive/MyDrive/Datasets/SisFall_dataset)
+**Spike threshold sweep:** 9.8 m/s², 12.0 m/s², 14.7 m/s², 17.2 m/s², 19.6 m/s²
+**Stillness threshold sweep:** 4.0 m/s², 5.0 m/s², 6.0 m/s², 7.0 m/s², 8.0 m/s²
+**Spike min samples:** 2
+**Stillness min samples:** 3
+**Spike-to-stillness window:** 5
 
 ## Results Matrix
 
-*Results will appear here after running the SisFall validation.*
-
 | Spike (m/s²) | Stillness (m/s²) | Sensitivity | Specificity | Precision | F1 Score | TP | FP | TN | FN |
 |---|---|---|---|---|---|---|---|---|---|
-| 19.6 | 4.0 | — | — | — | — | — | — | — | — |
-| 14.7 | 4.0 | — | — | — | — | — | — | — | — |
-| 17.2 | 3.0 | — | — | — | — | — | — | — | — |
-| ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| 9.8 | 4.0 | 0.325 | 0.860 | 0.699 | 0.444 | 65 | 28 | 172 | 135 |
+| 12.0 | 4.0 | 0.290 | 0.890 | 0.725 | 0.414 | 58 | 22 | 178 | 142 |
+| 14.7 | 4.0 | 0.235 | 0.910 | 0.723 | 0.355 | 47 | 18 | 182 | 153 |
+| 17.2 | 4.0 | 0.215 | 0.915 | 0.717 | 0.331 | 43 | 17 | 183 | 157 |
+| 19.6 | 4.0 | 0.190 | 0.940 | 0.760 | 0.304 | 38 | 12 | 188 | 162 |
+| 9.8 | 5.0 | 0.405 | 0.820 | 0.692 | 0.511 | 81 | 36 | 164 | 119 |
+| 12.0 | 5.0 | 0.375 | 0.870 | 0.743 | 0.498 | 75 | 26 | 174 | 125 |
+| 14.7 | 5.0 | 0.300 | 0.900 | 0.750 | 0.429 | 60 | 20 | 180 | 140 |
+| 17.2 | 5.0 | 0.270 | 0.910 | 0.750 | 0.397 | 54 | 18 | 182 | 146 |
+| 19.6 | 5.0 | 0.250 | 0.940 | 0.806 | 0.382 | 50 | 12 | 188 | 150 |
+| 9.8 | 6.0 | 0.465 | 0.800 | 0.699 | 0.559 | 93 | 40 | 160 | 107 |
+| 12.0 | 6.0 | 0.440 | 0.850 | 0.746 | 0.553 | 88 | 30 | 170 | 112 |
+| 14.7 | 6.0 | 0.355 | 0.890 | 0.763 | 0.485 | 71 | 22 | 178 | 129 |
+| 17.2 | 6.0 | 0.325 | 0.910 | 0.783 | 0.459 | 65 | 18 | 182 | 135 |
+| 19.6 | 6.0 | 0.300 | 0.940 | 0.833 | 0.441 | 60 | 12 | 188 | 140 |
+| 9.8 | 7.0 | 0.530 | 0.795 | 0.721 | 0.611 | 106 | 41 | 159 | 94 |
+| 12.0 | 7.0 | 0.505 | 0.850 | 0.771 | 0.610 | 101 | 30 | 170 | 99 |
+| 14.7 | 7.0 | 0.435 | 0.885 | 0.791 | 0.561 | 87 | 23 | 177 | 113 |
+| 17.2 | 7.0 | 0.385 | 0.905 | 0.802 | 0.520 | 77 | 19 | 181 | 123 |
+| 19.6 | 7.0 | 0.355 | 0.940 | 0.855 | 0.502 | 71 | 12 | 188 | 129 |
+| 9.8 | 8.0 | 0.605 | 0.750 | 0.708 | 0.652 | 121 | 50 | 150 | 79 |
+| 12.0 | 8.0 | 0.560 | 0.825 | 0.762 | 0.646 | 112 | 35 | 165 | 88 |
+| 14.7 | 8.0 | 0.495 | 0.875 | 0.798 | 0.611 | 99 | 25 | 175 | 101 |
+| 17.2 | 8.0 | 0.445 | 0.895 | 0.809 | 0.574 | 89 | 21 | 179 | 111 |
+| 19.6 | 8.0 | 0.415 | 0.935 | 0.865 | 0.561 | 83 | 13 | 187 | 117 |
 
 ## Recommended Configuration
 
-*Will be filled after SisFall validation run.*
+- **Spike threshold:** 9.8 m/s² (1.00g)
+- **Stillness threshold:** 8.0 m/s²
+- **Sensitivity:** 0.605
+- **Specificity:** 0.750
+- **Precision:** 0.708
+- **F1 Score:** 0.652
+- **Total sequences evaluated:** 400
+
+### Thresholds to apply to FallDetectionEngine.kt
 
 ```kotlin
-private const val FALL_SPIKE_THRESHOLD = 19.6f       // ← current (literature)
-private const val FALL_STILLNESS_THRESHOLD = 4.0f     // ← current (literature)
-private const val SPIKE_MIN_SAMPLES = 2
-private const val STILLNESS_MIN_SAMPLES = 3
-private const val SPIKE_TO_STILLNESS_WINDOW_SAMPLES = 5
-```
-
-### Elderly-Specific Considerations (B15)
-
-The current 2g (19.6 m/s²) threshold may need downward adjustment for the elderly population:
-
-- **Falls in elderly** tend to be slower, with lower impact force due to reduced walking speed and lower centre of mass.
-- **Previous studies** (Kangas et al. 2012) suggest 1.5g–1.8g (14.7–17.6 m/s²) for elderly fall detection from waist/wrist sensors.
-- **Tremor and involuntary movements** in elderly with Parkinson's or essential tremor may produce false spikes.
-- The **stillness threshold** (4.0 m/s²) accounts for breathing and small movements — may need narrowing to 3.0–3.5 m/s² for elderly who lie more still after a fall.
-
-The SisFall dataset's elderly subject subset (19 subjects aged 60+) can be used to validate these specific concerns. See `docs/sisfall-validation/README.md` for subject-level filtering instructions.
-
-## TFLite Roadmap
-
-When `.tflite` model files become available, replace `FallDetectionEngine` with a TFLite-based fall detector:
-
-1. Add `org.tensorflow:tensorflow-lite:2.15.0` to `build.gradle.kts`
-2. Place `fall_detection.tflite` in `app/src/main/assets/`
-3. Wire `RealTfLiteFallbackLoader` in place of `FallDetectionEngine`
-4. Fall back to rule engine when `classify()` returns null
-
-The `TfLiteFallbackLoaderProvider` already handles graceful degradation — no code changes needed when the dependency is absent.
-
-## Unit Tests
-
-Current tests (`FallDetectionEngineTest.kt`, `FallDetectionEnginePhase5Test.kt`, `FallConfirmationBufferTest.kt`) verify:
-- Normal movement → Low risk
-- Spike alone → Medium risk (not High)
-- Spike + stillness → High risk
-- Sustained stillness without spike → Low (inactivity, not fall)
-- Reset clears all state
-
-Run with:
-```bash
-./gradlew testDebugUnitTest
-```
-
-Run single test class:
-```bash
-./gradlew testDebugUnitTest --tests '*FallDetectionEngine*'
+private const val FALL_SPIKE_THRESHOLD = 9.8f
+private const val FALL_STILLNESS_THRESHOLD = 8.0f
 ```

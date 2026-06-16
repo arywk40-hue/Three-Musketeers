@@ -19,7 +19,12 @@ object SensorFrameMerger {
     private val fallDetectionEngine = FallDetectionEngine
     private var inactivitySeconds = 0
 
-    fun merge(base: SensorFrame, ble: SmartSuitBleTelemetry, tfliteModel: FallDetectionTfliteModel? = null): SensorFrame {
+    fun reset() {
+        inactivitySeconds = 0
+        fallBuffer.reset()
+    }
+
+    fun merge(base: SensorFrame, ble: SmartSuitBleTelemetry, tfliteModel: FallDetectionTfliteModel? = null, patientAgeYears: Int = 70): SensorFrame {
         val hasBle = ble.heartRateBpm != null
         if (!hasBle) return base
 
@@ -66,6 +71,7 @@ object SensorFrameMerger {
             spo2Percent = spo2Percent,
             respiratoryRate = respiratoryRate,
             imuMagnitude = imuMagnitude,
+            ageYears = patientAgeYears,
         )
 
         val posture = when (fall?.riskStatus) {

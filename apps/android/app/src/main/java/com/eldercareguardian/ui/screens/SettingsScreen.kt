@@ -86,7 +86,7 @@ fun SettingsScreen(
     selectedPatientId: Long = 0L,
     selectedPatient: Patient? = null,
     onSelectPatient: (Long) -> Unit = {},
-    onAddPatient: suspend (name: String, caregiverName: String, caregiverPhone: String) -> Long = { _, _, _ -> 0L },
+    onAddPatient: suspend (name: String, caregiverName: String, caregiverPhone: String, ageYears: Int) -> Long = { _, _, _, _ -> 0L },
     onUpdatePatient: suspend (Patient) -> Unit = {},
     onDeletePatient: suspend (Patient) -> Unit = {},
     onExportData: suspend (Context) -> Intent = { Intent() },
@@ -331,7 +331,7 @@ private fun PatientSection(
     selectedPatientId: Long,
     selectedPatient: Patient?,
     onSelectPatient: (Long) -> Unit,
-    onAddPatient: suspend (name: String, caregiverName: String, caregiverPhone: String) -> Long,
+    onAddPatient: suspend (name: String, caregiverName: String, caregiverPhone: String, ageYears: Int) -> Long,
     onUpdatePatient: suspend (Patient) -> Unit,
     onDeletePatient: suspend (Patient) -> Unit,
 ) {
@@ -433,9 +433,9 @@ private fun PatientSection(
         PatientFormDialog(
             title = "Add patient",
             initial = null,
-            onConfirm = { name, cgName, cgPhone ->
+            onConfirm = { name, cgName, cgPhone, age ->
                 scope.launch {
-                    val id = onAddPatient(name, cgName, cgPhone)
+                    val id = onAddPatient(name, cgName, cgPhone, age)
                     if (id > 0) onSelectPatient(id)
                 }
                 showAddDialog = false
@@ -448,9 +448,9 @@ private fun PatientSection(
         PatientFormDialog(
             title = "Edit patient",
             initial = patient,
-            onConfirm = { name, cgName, cgPhone ->
+            onConfirm = { name, cgName, cgPhone, age ->
                 scope.launch {
-                    onUpdatePatient(patient.copy(name = name, caregiverName = cgName, caregiverPhone = cgPhone))
+                    onUpdatePatient(patient.copy(name = name, caregiverName = cgName, caregiverPhone = cgPhone, ageYears = age))
                 }
                 patientToEdit = null
             },
@@ -482,12 +482,13 @@ private fun PatientSection(
 private fun PatientFormDialog(
     title: String,
     initial: Patient?,
-    onConfirm: (name: String, caregiverName: String, caregiverPhone: String) -> Unit,
+    onConfirm: (name: String, caregiverName: String, caregiverPhone: String, ageYears: Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(TextFieldValue(initial?.name ?: "")) }
     var cgName by remember { mutableStateOf(TextFieldValue(initial?.caregiverName ?: "")) }
     var cgPhone by remember { mutableStateOf(TextFieldValue(initial?.caregiverPhone ?: "")) }
+    var age by remember { mutableStateOf(TextFieldValue(initial?.ageYears?.toString() ?: "70")) }
 
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
@@ -516,13 +517,22 @@ private fun PatientFormDialog(
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 )
+                OutlinedTextField(
+                    value = age,
+                    onValueChange = { age = it },
+                    label = { Text("Age (years)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
                     if (name.text.isNotBlank()) {
-                        onConfirm(name.text.trim(), cgName.text.trim(), cgPhone.text.trim())
+                        val ageValue = age.text.toIntOrNull() ?: 70
+                        onConfirm(name.text.trim(), cgName.text.trim(), cgPhone.text.trim(), ageValue.coerceIn(1, 120))
                     }
                 },
             ) { Text("Save") }

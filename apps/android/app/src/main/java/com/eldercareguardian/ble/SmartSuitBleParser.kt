@@ -38,7 +38,7 @@ object SmartSuitBleParser {
         val buffer = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
         val values = MutableList(payload.size / 4) { buffer.getFloat() }
         if (expectedCount != null && values.size != expectedCount) return emptyList()
-        return SensorFrameValidation.imuSamples(values)
+        return values.toList()
     }
 
     /** Simplified PLX Continuous Measurement parser. Firmware encoding:

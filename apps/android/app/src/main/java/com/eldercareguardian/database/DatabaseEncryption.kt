@@ -8,6 +8,7 @@ import androidx.security.crypto.MasterKey
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import java.security.KeyStoreException
 import java.security.SecureRandom
+import kotlin.jvm.Volatile
 
 /**
  * Manages SQLCipher database encryption passphrase.
@@ -54,6 +55,7 @@ object DatabaseEncryption {
     /** Check whether the SQLCipher native library is available. */
     fun isSqlCipherAvailable(): Boolean = sqlCipherAvailable
 
+    @Volatile
     private var _supportFactory: SupportOpenHelperFactory? = null
 
     /**
@@ -63,32 +65,35 @@ object DatabaseEncryption {
      * @throws IllegalStateException if the SQLCipher native library is not loaded.
      */
     fun supportFactory(context: Context): SupportOpenHelperFactory {
-        if (!sqlCipherAvailable) {
-            throw IllegalStateException(
-                "SQLCipher native library failed to load. " +
-                "Database encryption is unavailable. Error: ${sqlCipherLoadError?.message}"
-            )
+        // Fast path — already initialized (volatile read, no lock needed)
+        _supportFactory?.let { return it }
+
+        // Slow path — synchronized init with proper double-check
+        return synchronized(this) {
+            _supportFactory ?: run {
+                if (!sqlCipherAvailable) {
+                    throw IllegalStateException(
+                        "SQLCipher native library failed to load. " +
+                        "Database encryption is unavailable. Error: ${sqlCipherLoadError?.message}"
+                    )
+                }
+                val passphrase = try {
+                    getOrCreateEncryptedPassphrase(context)
+                } catch (e: KeyStoreException) {
+                    Log.w(TAG, "AndroidKeyStore unavailable, using fallback storage", e)
+                    getOrCreateFallbackPassphrase(context)
+                } catch (e: java.security.NoSuchAlgorithmException) {
+                    Log.w(TAG, "KeyStore algorithm unavailable, using fallback storage", e)
+                    getOrCreateFallbackPassphrase(context)
+                } catch (e: Exception) {
+                    // Catch-all for EncryptedSharedPreferences init failures
+                    // (e.g. corrupted tink keyset, device migration edge cases)
+                    Log.w(TAG, "EncryptedSharedPreferences failed, using fallback storage", e)
+                    getOrCreateFallbackPassphrase(context)
+                }
+                SupportOpenHelperFactory(passphrase.toByteArray()).also { _supportFactory = it }
+            }
         }
-
-        val existing = _supportFactory
-        if (existing != null) return existing
-
-        val passphrase = try {
-            getOrCreateEncryptedPassphrase(context)
-        } catch (e: KeyStoreException) {
-            Log.w(TAG, "AndroidKeyStore unavailable, using fallback storage", e)
-            getOrCreateFallbackPassphrase(context)
-        } catch (e: java.security.NoSuchAlgorithmException) {
-            Log.w(TAG, "KeyStore algorithm unavailable, using fallback storage", e)
-            getOrCreateFallbackPassphrase(context)
-        } catch (e: Exception) {
-            // Catch-all for EncryptedSharedPreferences init failures
-            // (e.g. corrupted tink keyset, device migration edge cases)
-            Log.w(TAG, "EncryptedSharedPreferences failed, using fallback storage", e)
-            getOrCreateFallbackPassphrase(context)
-        }
-
-        return SupportOpenHelperFactory(passphrase.toByteArray()).also { _supportFactory = it }
     }
 
     /**

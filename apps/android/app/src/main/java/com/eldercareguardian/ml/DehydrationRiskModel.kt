@@ -2,6 +2,14 @@ package com.eldercareguardian.ml
 
 import com.eldercareguardian.data.RiskStatus
 
+/**
+ * Elevated Perspiration Indicator (formerly "Dehydration Risk").
+ *
+ * Renamed per validation plan: no publicly available wearable dehydration
+ * dataset exists to validate a dehydration label. This model only triggers
+ * hydration reminders. It must NOT generate emergency or warning alerts —
+ * only Check-level caregiver suggestions at most.
+ */
 object DehydrationRiskModel {
     private const val HIGH_SWEAT_RATE = 1.5f
     private const val MED_SWEAT_RATE = 0.8f
@@ -13,6 +21,8 @@ object DehydrationRiskModel {
     data class DehydrationAssessment(
         val risk: RiskStatus,
         val score: Float,
+        /** Human-readable label. Always uses reframed wellness language. */
+        val displayLabel: String,
     )
 
     fun assess(
@@ -41,6 +51,11 @@ object DehydrationRiskModel {
             score >= 0.4f -> RiskStatus.Medium
             else -> RiskStatus.Low
         }
-        return DehydrationAssessment(risk, score)
+        val displayLabel = when (risk) {
+            RiskStatus.High   -> "High perspiration — consider hydrating"
+            RiskStatus.Medium -> "Elevated perspiration"
+            RiskStatus.Low    -> "Normal perspiration"
+        }
+        return DehydrationAssessment(risk, score, displayLabel)
     }
 }

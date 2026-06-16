@@ -12,6 +12,7 @@ data class PatientEntity(
     val caregiverPhone: String = "",
     val notes: String = "",
     val createdAt: Long = System.currentTimeMillis(),
+    val ageYears: Int = 70,
 )
 
 fun PatientEntity.toPatient(): Patient = Patient(
@@ -21,6 +22,7 @@ fun PatientEntity.toPatient(): Patient = Patient(
     caregiverPhone = caregiverPhone,
     notes = notes,
     createdAt = createdAt,
+    ageYears = ageYears,
 )
 
 fun Patient.toEntity(): PatientEntity = PatientEntity(
@@ -30,4 +32,5 @@ fun Patient.toEntity(): PatientEntity = PatientEntity(
     caregiverPhone = caregiverPhone,
     notes = notes,
     createdAt = createdAt,
+    ageYears = ageYears,
 )

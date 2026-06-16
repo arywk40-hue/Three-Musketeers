@@ -1,6 +1,8 @@
 # ElderCare Guardian — Launch Blockers
 
-**Verdict:** All resolved for pilot deployment. No code-level blockers remain.
+**Verdict:** B20–B27 identified in June 2026 build audit. B21 (google-services.json) still requires manual
+Firebase console download. All others resolved. Re-run `./gradlew assembleDebug` to confirm clean build
+before pilot deployment.
 
 ---
 
@@ -27,6 +29,14 @@
 | B17: Differentiation story | P3 | Ongoing (marketing) |
 | B18: Competitor moats | P3 | Ongoing (strategy) |
 | B19: PCB manufacturing | P3 | Post-pilot |
+| B20: Firebase plugin not applied in app module        | P0 | ✅ Fixed — Fix 1A in build audit |
+| B21: google-services.json missing from app/           | P0 | ⏳ Pending — must download from Firebase console |
+| B22: SmsManager.getDefault() crashes on API 31+       | P1 | ✅ Fixed — Fix 2C in build audit |
+| B23: DatabaseEncryption TOCTOU race condition         | P1 | ✅ Fixed — Fix 2A in build audit |
+| B24: Foreground service type flags missing (API 34)   | P1 | ✅ Fixed — Fix 2D in build audit |
+| B25: parseFloat32Array corrupts ECG with IMU clamping | P0 | ✅ Fixed — Fix 3C in build audit |
+| B26: CaregiverAlertPolicy state bleeds across patients| P1 | ✅ Fixed — Fix 3A in build audit |
+| B27: SensorFrameMerger inactivity persists on switch  | P1 | ✅ Fixed — Fix 3B in build audit |
 
 **P0: 0 remaining · P1: 0 remaining · P2: 1 deferred (B14) · P3: 3 ongoing**
 

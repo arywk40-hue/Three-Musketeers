@@ -6,19 +6,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
+
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.ExperimentalFoundationApi
+
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessibilityNew
 import androidx.compose.material.icons.filled.ContactPhone
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Favorite
@@ -69,6 +72,7 @@ import com.eldercareguardian.ui.components.DataSourceChip
 import com.eldercareguardian.ui.components.PillStatus
 import com.eldercareguardian.ui.components.StatusPill
 import com.eldercareguardian.ui.components.UrgentAlertBanner
+import com.eldercareguardian.ui.screens.BodyScreen
 import com.eldercareguardian.ui.screens.CaregiverScreen
 import com.eldercareguardian.ui.screens.ReadinessScreen
 import com.eldercareguardian.ui.screens.SafetyScreen
@@ -188,6 +192,7 @@ private enum class AppTab(
     val icon: ImageVector,
 ) {
     Vitals("Vitals", Icons.Filled.Favorite),
+    Body("Body", Icons.Filled.AccessibilityNew),
     Safety("Safety", Icons.Filled.HealthAndSafety),
     Caregiver("Care", Icons.Filled.ContactPhone),
     Readiness("Ready", Icons.Filled.Checklist),
@@ -272,7 +277,7 @@ private fun AppShell(
     selectedPatientId: Long,
     selectedPatient: Patient?,
     onSelectPatient: (Long) -> Unit,
-    onAddPatient: suspend (name: String, caregiverName: String, caregiverPhone: String) -> Long,
+    onAddPatient: suspend (name: String, caregiverName: String, caregiverPhone: String, ageYears: Int) -> Long,
     onUpdatePatient: suspend (Patient) -> Unit,
     onDeletePatient: suspend (Patient) -> Unit,
     onExportData: suspend (android.content.Context) -> android.content.Intent,
@@ -366,6 +371,11 @@ private fun AppShell(
                                 hrTrend = hrTrend,
                                 spo2Trend = spo2Trend,
                             )
+                        }
+                    }
+                    AppTab.Body -> {
+                        item {
+                            BodyScreen(frame = frame)
                         }
                     }
                     AppTab.Safety -> {
@@ -480,7 +490,6 @@ private fun ModeNotice(sessionMode: SessionMode) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun Header(
     frame: SensorFrame,
@@ -494,10 +503,13 @@ private fun Header(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f, fill = false)) {
+        Column(
+            modifier = Modifier.weight(1f, fill = false),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             Text(
                 text = "ElderCare Guardian",
                 style = MaterialTheme.typography.headlineMedium,
@@ -514,15 +526,18 @@ private fun Header(
                 )
             }
         }
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Column(
+            horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            maxItemsInEachRow = 2,
         ) {
-            ModeSwitch(sessionMode, onSessionModeSelected)
-            DataSourceChip(bleConnectionState)
-            StatusPill(label = frame.fatigue.name, status = PillStatus.Fatigue(frame.fatigue))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ModeSwitch(sessionMode, onSessionModeSelected)
+                DataSourceChip(bleConnectionState)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusPill(label = frame.fatigue.name, status = PillStatus.Fatigue(frame.fatigue))
+                Spacer(Modifier.width(0.dp))
+            }
         }
     }
 }
@@ -667,7 +682,7 @@ private fun AppShellVitalsPreview() {
             selectedPatientId = 0L,
             selectedPatient = null,
             onSelectPatient = {},
-            onAddPatient = { _, _, _ -> 0L },
+            onAddPatient = { _, _, _, _ -> 0L },
             onUpdatePatient = {},
             onDeletePatient = {},
             onExportData = { android.content.Intent() },

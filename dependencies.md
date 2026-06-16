@@ -122,8 +122,9 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("kotlin-parcelize")
+    // id("kotlin-parcelize")  ← REMOVED: unused in this project
     id("com.google.devtools.ksp")
+    id("com.google.gms.google-services")   // ← ADD: required for Firebase FCM
 }
 
 import java.util.Properties
@@ -216,7 +217,9 @@ dependencies {
 }
 ```
 
-> **Note:** TFLite deps (`org.tensorflow:tensorflow-lite:2.15.0` + support/gpu) are NOT added — they are deferred until `.tflite` model files exist. The `TfLiteFallbackLoader` uses reflection like the Samsung bridge, so the app compiles without them. Add when model files land in `assets/`.
+> **Note:** TFLite runtime is ACTIVE in build.gradle.kts (tensorflow-lite:2.15.0).
+> The `TfLiteFallbackLoader` uses reflection so no `.tflite` file is needed to compile,
+> but the dependency IS declared. Remove it only if binary size is a concern.
 
 ---
 
@@ -574,7 +577,7 @@ Gson:                       2.9.0
 SQLCipher:                  4.5.6
 Firebase BOM:               33.1.0
 
-DEFERRED (add when .tflite model files exist):
+ACTIVE (declared in build.gradle.kts):
 TFLite:                     2.15.0
 TFLite Support:             0.4.4
 TFLite Metadata:            0.4.4
@@ -594,7 +597,8 @@ Samsung Health SDK for Android  (deprecated July 31, 2025)
 
 **Samsung Health Data SDK is a local AAR, not on Maven.** If an LLM writes `implementation("com.samsung.android.sdk.healthdata:...")` that line doesn't work — the package doesn't exist on any public repo. Always reference the local file.
 
-**`kotlin-parcelize` plugin is required.** The Data SDK's data classes use `@Parcelize`. Without the plugin your build fails with a cryptic error.
+**Do NOT add `kotlin-parcelize` unless you have `@Parcelize` classes in your own code.**
+The Samsung Health Data SDK AAR ships pre-compiled — its internal Parcelable classes don't require the plugin on your side.
 
 **Java 17 for Data SDK, Java 1.8 for Sensor SDK.** If you have both in the same project (phone module + Wear OS module), each module sets its own `compileOptions` independently.
 

@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
+private val Context.caregiverPrefsStore: DataStore<Preferences> by preferencesDataStore(
     name = "eldercare_caregiver",
 )
 
@@ -26,7 +26,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
  * DataStore actor.
  */
 class CaregiverPreferences private constructor(context: Context) {
-    private val store: DataStore<Preferences> = context.applicationContext.dataStore
+    private val store: DataStore<Preferences> = context.applicationContext.caregiverPrefsStore
 
     val caregiverPhone: Flow<String> = store.data
         .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }

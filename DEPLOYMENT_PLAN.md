@@ -40,6 +40,10 @@ Each track has independent timelines and can progress in parallel.
 5. Configure `signingConfig` in `build.gradle.kts` (local keystore.properties + CI env vars) ✅ Done
 
 ### Build Checklist
+- [ ] Add `id("com.google.gms.google-services")` to app/build.gradle.kts plugins block
+- [ ] Download `google-services.json` from Firebase console → place in `apps/android/app/`
+- [ ] Remove unused `id("kotlin-parcelize")` from app/build.gradle.kts
+- [ ] Add `apps/privacy-policy/` to `.github/workflows/pages.yml` paths so it deploys to GitHub Pages
 - [x] Enable R8 minification in `buildTypes.release`
 - [x] Create `proguard-rules.pro` with Room, SQLCipher, Gson rules
 - [x] Set `versionCode` auto-increment in CI (`VERSION_CODE`/`VERSION_NAME` env vars)
@@ -49,7 +53,10 @@ Each track has independent timelines and can progress in parallel.
 - [ ] Generate 512×512 PNG for Play Store (use Android Studio Image Asset Studio)
 - [ ] Write app description, screenshots for Play Store listing — docs/play-store-listing.md created, screenshots not captured
 - [x] Set `targetSdkVersion = 35` (required for new apps on Play)
-- [ ] Handle `SEND_SMS` permission — Play Store requires justification
+- [ ] Handle `SEND_SMS` permission — submit Play Store Declaration Form with:
+  Use case: "Emergency caregiver SMS alert when patient falls or triggers SOS.
+  No marketing or commercial SMS. Permission is only requested when the user
+  explicitly enables SMS alerts in Settings."
 
 ### Play Store Policy Compliance
 - [x] Remove any diagnostic claims from app — **done**

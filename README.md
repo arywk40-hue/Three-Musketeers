@@ -3,7 +3,7 @@
 
 **Team:** Pranay · Ariyan · Reman Dey  
 **Institution:** IIT Mandi  
-**Version:** 1.0.0-beta — Pre
+**Version:** 1.0.0-beta — Pre-pilot (June 2026)
 **Date:** June 2026
 
 ---
@@ -25,10 +25,10 @@ The existing BLE, Samsung Health, simulator, GATT parsing, and Android dashboard
 - IMU 6-axis motion (MPU-6050) ✅
 - Battery voltage (ESP32-C3 ADC) ✅
 
-**Biometrics monitored** *(deferred)*
-- ECG waveform (AD8232)
-- Skin temperature (TMP117)
-- Sweat / humidity (SHT40)
+**Biometrics monitored** *(simulator-backed — real hardware deferred)*
+- ECG waveform (AD8232) — simulator generates 256-sample QRS window ✅
+- Skin temperature (TMP117) — simulator generates skinTempC ✅
+- Sweat / humidity (SHT40) — simulator generates humidityPercent + sweatRate ✅
 
 **Elder safety**
 - Fall detection — IMU-based impact + posture change ✅
@@ -141,7 +141,7 @@ app/src/main/java/com/eldercareguardian/
 | Dehydration risk | ✅ DehydrationRiskModel | Tabular rules |
 | Vitals risk | ✅ VitalsRiskMonitor | Composite score |
 | Overexertion | ✅ OverexertionModel | HR reserve + SpO2 |
-| BP estimation | ❌ **Removed from display** | Clinically invalid |
+| BP estimation | ✅ Active — displayed with "est mmHg" label | Linear HR+temp model; removed from Samsung Health writes only |
 | TFLite models | ⏳ Scaffold exists (`TfLiteFallbackLoader`), no `.tflite` files yet | See `THINGS_LEFT.md` |
 
 ### Samsung Health Integration *(reflection bridge active, AAR optional)*
@@ -197,6 +197,12 @@ Custom ElderCare Service (12345678-1234-5678-1234-567812345678)
 | 8 | Release pipeline + signing (CI env vars) | ✅ Done |
 | 9 | Privacy policy + Play Store listing | ✅ Done |
 | 10 | SisFall validation harness + TFLite scaffold | ✅ Done |
+| 11 | DPDPA consent screen + DataStore | ✅ Done |
+| 12 | Multi-patient profile system (Room) | ✅ Done |
+| 13 | Health history + data export/delete | ✅ Done |
+| 14 | Samsung Health reflection bridge | ✅ Done |
+| 15 | SpO2 quality + 3-reading debounce + 4-level alert | ✅ Done |
+| 16 | Security hardening (SQLCipher, EncryptedSharedPrefs, permissions tier split) | ✅ Done |
 
 ---
 

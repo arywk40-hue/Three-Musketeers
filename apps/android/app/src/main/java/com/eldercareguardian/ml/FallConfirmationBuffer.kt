@@ -26,4 +26,8 @@ class FallConfirmationBuffer(
 
         return latest.riskStatus
     }
+
+    fun reset() {
+        recent.clear()
+    }
 }

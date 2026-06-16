@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [AlertEventEntity::class, PatientEntity::class, HealthDataEntity::class], version = 3, exportSchema = false)
+@Database(entities = [AlertEventEntity::class, PatientEntity::class, HealthDataEntity::class], version = 4, exportSchema = false)
 abstract class ElderCareDatabase : RoomDatabase() {
     abstract fun alertEventDao(): AlertEventDao
     abstract fun patientDao(): PatientDao
@@ -22,7 +22,7 @@ abstract class ElderCareDatabase : RoomDatabase() {
                     "eldercare_encrypted.db",
                 )
                     .openHelperFactory(DatabaseEncryption.supportFactory(context))
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build().also { INSTANCE = it }
             }
         }

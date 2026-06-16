@@ -31,6 +31,8 @@ import com.eldercareguardian.database.toEntity
 import com.eldercareguardian.database.toHealthSnapshot
 import com.eldercareguardian.database.toPatient
 import com.eldercareguardian.ml.AlertHistoryTracker
+import com.eldercareguardian.ml.CaregiverAlertPolicy
+import com.eldercareguardian.ml.FallDetectionEngine
 import com.eldercareguardian.ml.FallDetectionTfliteModel
 import com.eldercareguardian.notifications.CaregiverAlertDispatcher
 import com.eldercareguardian.notifications.FcmAlertSender
@@ -59,6 +61,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SmartSuitViewModel(application: Application) : AndroidViewModel(application) {
@@ -165,7 +168,7 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     val frames: StateFlow<SensorFrame?> = _frameSource.flatMapLatest { source: Flow<SensorFrame> ->
         combine(source, bleDataSource.telemetry, _sosOverride) { simFrame: SensorFrame, bleTelemetry: SmartSuitBleTelemetry, sosActive: Boolean ->
             val baseFrame = if (bleDataSource.connectionState.value == BleConnectionState.Connected && bleTelemetry.heartRateBpm != null) {
-                SensorFrameMerger.merge(simFrame, bleTelemetry, tfliteModel)
+                SensorFrameMerger.merge(simFrame, bleTelemetry, tfliteModel, selectedPatient.value?.ageYears ?: 70)
             } else {
                 simFrame
             }
@@ -342,16 +345,20 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     // ── Patient profile CRUD ──
 
     fun selectPatient(patientId: Long) {
+        CaregiverAlertPolicy.reset()
+        FallDetectionEngine.reset()
+        SensorFrameMerger.reset()
         viewModelScope.launch {
             activePatientPrefs.setActivePatientId(patientId)
         }
     }
 
-    suspend fun addPatient(name: String, caregiverName: String, caregiverPhone: String): Long {
+    suspend fun addPatient(name: String, caregiverName: String, caregiverPhone: String, ageYears: Int): Long {
         val entity = PatientEntity(
             name = name.trim(),
             caregiverName = caregiverName.trim(),
             caregiverPhone = caregiverPhone.trim(),
+            ageYears = ageYears,
         )
         return withContext(Dispatchers.IO) {
             patientDao.insert(entity)
@@ -376,13 +383,19 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     // ── DPDPA Data export (suspend — call from UI coroutine scope) ──
 
     suspend fun exportData(context: Context): Intent {
-        val patients = withContext(Dispatchers.IO) { patientDao.getAllOnce() }
-        val allHealth = withContext(Dispatchers.IO) { healthDataDao.getAll() }
-        val allAlerts = withContext(Dispatchers.IO) { alertEventDao.getAll() }
-        val file = withContext(Dispatchers.IO) {
-            DataExporter.exportJson(context, patients, allHealth, allAlerts)
+        return try {
+            val patients = withContext(Dispatchers.IO) { patientDao.getAllOnce() }
+            val allHealth = withContext(Dispatchers.IO) { healthDataDao.getAll() }
+            val allAlerts = withContext(Dispatchers.IO) { alertEventDao.getAll() }
+            val file = withContext(Dispatchers.IO) {
+                DataExporter.exportJson(context, patients, allHealth, allAlerts)
+            }
+            DataExporter.createShareIntent(context, file)
+        } catch (e: IOException) {
+            android.util.Log.e("SmartSuitViewModel", "Export failed: ${e.message}")
+            // Return an empty intent — the UI must handle this gracefully
+            Intent()
         }
-        return DataExporter.createShareIntent(context, file)
     }
 
     // ── DPDPA Right to erasure — wipe all local data ──

@@ -136,72 +136,109 @@ class DetectionEngine:
 
 # ── CSV Parsing ──────────────────────────────────────────────────────────────
 
-def parse_sample(line: str, has_header: bool = False, delimiter: str = ",") -> Optional[tuple[float, float, float]]:
-    """Parse a single line from a SisFall CSV file.
+# SisFall sensor constants
+ADXL345_RANGE_G = 16.0
+ADXL345_RESOLUTION_BITS = 13
+ADXL345_SCALE = (2.0 * ADXL345_RANGE_G) / (2.0 ** ADXL345_RESOLUTION_BITS)  # g per bit
+
+MMA8451Q_RANGE_G = 8.0
+MMA8451Q_RESOLUTION_BITS = 14
+MMA8451Q_SCALE = (2.0 * MMA8451Q_RANGE_G) / (2.0 ** MMA8451Q_RESOLUTION_BITS)
+
+ITG3200_RANGE_DPS = 2000.0
+ITG3200_RESOLUTION_BITS = 16
+ITG3200_SCALE = (2.0 * ITG3200_RANGE_DPS) / (2.0 ** ITG3200_RESOLUTION_BITS)
+
+
+def parse_sisfall_line(line: str) -> Optional[tuple[float, float, float]]:
+    """Parse a single line from a SisFall file.
     
-    Returns (ax, ay, az) in m/s², or None if the line should be skipped.
+    Returns (ax, ay, az) in m/s² from the ADXL345 waist sensor (columns 0,1,2).
     
-    SisFall default sensor setup columns (ADXL345 at waist, ±16g):
-        Sample, ax_waist(g), ay_waist(g), az_waist(g),
-        gx_waist(°/s), gy_waist(°/s), gz_waist(°/s),
-        ax_wrist(g), ay_wrist(g), az_wrist(g),
-        gx_wrist(°/s), gy_wrist(°/s), gz_wrist(°/s),
-        ...
-    
-    We use the **waist** ADXL345 columns (indices 1, 2, 3) since that
-    matches the sensor placement our firmware targets.
+    SisFall columns (9 columns, semicolon- or comma-delimited, no header):
+    0: ax_waist (ADXL345) - bits
+    1: ay_waist (ADXL345) - bits  
+    2: az_waist (ADXL345) - bits
+    3: gx_waist (ITG3200) - bits
+    4: gy_waist (ITG3200) - bits
+    5: gz_waist (ITG3200) - bits
+    6: ax_wrist (MMA8451Q) - bits
+    7: ay_wrist (MMA8451Q) - bits
+    8: az_wrist (MMA8451Q) - bits
     """
-    line = line.strip()
+    line = line.strip().rstrip(";")
     if not line:
         return None
-    parts = line.split(delimiter)
-    if len(parts) < 4:
+    
+    # SisFall uses comma-delimited with optional trailing semicolons
+    parts = line.split(",")
+    if len(parts) < 3:
+        # Try semicolon
+        parts = line.split(";")
+    if len(parts) < 3:
+        # Try whitespace
+        parts = line.split()
+    if len(parts) < 3:
         return None
-    if has_header and parts[0].strip().lower() in ("sample", "timestamp", "time"):
-        return None
+    
     try:
-        ax = float(parts[1]) * 9.81  # Convert g → m/s²
-        ay = float(parts[2]) * 9.81
-        az = float(parts[3]) * 9.81
+        # ADXL345 waist sensor columns 0,1,2 (convert bits → g → m/s²)
+        ax_bits = float(parts[0].strip().rstrip(";"))
+        ay_bits = float(parts[1].strip().rstrip(";"))
+        az_bits = float(parts[2].strip().rstrip(";"))
+        
+        ax = ax_bits * ADXL345_SCALE * 9.81
+        ay = ay_bits * ADXL345_SCALE * 9.81
+        az = az_bits * ADXL345_SCALE * 9.81
     except (ValueError, IndexError):
         return None
     return (ax, ay, az)
 
 
-def detect_file_format(filepath: str) -> tuple[bool, str]:
-    """Detect whether the file has a header row and the delimiter."""
-    with open(filepath, "r") as f:
-        first = f.readline().strip()
-        second = f.readline().strip()
-    
-    # Check if first line looks like a header
-    header_keywords = ("sample", "timestamp", "time", "ax", "ay", "az")
-    first_lower = first.lower().split(",")[0].strip()
-    has_header = any(kw in first_lower for kw in header_keywords)
-    
-    # Detect delimiter
-    comma_count = first.count(",")
-    space_count = first.count(" ")
-    delim = "," if comma_count > space_count else None
-    
-    return has_header, delim
-
-
-def load_sequence(filepath: str) -> list[tuple[float, float, float]]:
-    """Load a sequence of (ax, ay, az) samples from a SisFall CSV file."""
-    has_header, delim = detect_file_format(filepath)
+def load_sisfall_sequence(filepath: str) -> list[tuple[float, float, float]]:
+    """Load a sequence of (ax, ay, az) samples from a SisFall file."""
     samples: list[tuple[float, float, float]] = []
     with open(filepath, "r") as f:
         for line in f:
-            result = parse_sample(line, has_header, ",")
+            result = parse_sisfall_line(line)
             if result is not None:
                 samples.append(result)
-            elif delim != ",":
-                # Try whitespace delimiter
-                result = parse_sample(line, has_header, None)
-                if result is not None:
-                    samples.append(result)
     return samples
+
+
+def is_fall_file(filename: str) -> bool:
+    """Determine if a SisFall file is a fall (F prefix) or ADL (D prefix)."""
+    # File format: <CODE>_<SUBJECT>_<TRIAL>.txt
+    # F01-F15 = falls, D01-D19 = ADL
+    code = filename.split("_")[0]
+    return code.startswith("F")
+
+
+def collect_sisfall_files(data_dir: str) -> tuple[list[str], list[str]]:
+    """Collect fall and ADL file paths from SisFall dataset.
+    
+    Expected structure: data_dir/SA01/, data_dir/SE01/, etc.
+    """
+    fall_files: list[str] = []
+    adl_files: list[str] = []
+    
+    for subject_dir in sorted(os.listdir(data_dir)):
+        subject_path = os.path.join(data_dir, subject_dir)
+        if not os.path.isdir(subject_path):
+            continue
+        if subject_dir.startswith("."):
+            continue
+            
+        for fname in sorted(os.listdir(subject_path)):
+            if not fname.endswith(".txt") or fname.startswith("."):
+                continue
+            fpath = os.path.join(subject_path, fname)
+            if is_fall_file(fname):
+                fall_files.append(fpath)
+            else:
+                adl_files.append(fpath)
+    
+    return fall_files, adl_files
 
 
 # ── Classification ──────────────────────────────────────────────────────────
@@ -211,18 +248,46 @@ def classify_sequence(
     engine: DetectionEngine,
     sample_rate_hz: float = 200.0,
 ) -> bool:
-    """Run a sequence through the engine. Returns True if fall detected."""
+    """Run a sequence through the engine. Returns True if fall detected.
+    
+    SisFall data includes gravity, but the Kotlin engine operates on
+    gravity-compensated data from the BLE sensor (ESP32 firmware subtracts
+    gravity before transmission). We subtract gravity magnitude from the
+    raw acceleration before feeding to the engine.
+    
+    Downsample by taking max magnitude in 100ms windows (20 samples at 200 Hz).
+    This matches the ~1 Hz BLE notify rate while preserving peak magnitudes.
+    """
     engine.reset()
     
-    # Decimate to ~1 Hz to match BLE notify rate, or use sliding window
-    # If sampling at 200 Hz, take every Nth sample where N = sample_rate_hz
-    decimation = max(1, int(sample_rate_hz / 1.0))
+    GRAVITY = 9.81
     
-    for i, (ax, ay, az) in enumerate(samples):
-        if i % decimation == 0:
-            result = engine.assess(ax, ay, az)
-            if result.risk_status == "High":
-                return True
+    window_size = max(1, int(sample_rate_hz / 10.0))  # 100ms windows
+    for i in range(0, len(samples), window_size):
+        window = samples[i:i+window_size]
+        if not window:
+            continue
+        # Take the sample with maximum magnitude in this window
+        max_sample = max(window, key=lambda s: s[0]*s[0] + s[1]*s[1] + s[2]*s[2])
+        ax, ay, az = max_sample
+        
+        # Subtract gravity: compute raw magnitude then subtract 1g
+        # This approximates the gravity-compensated output from the BLE sensor
+        raw_mag = math.sqrt(ax*ax + ay*ay + az*az)
+        compensated_mag = abs(raw_mag - GRAVITY)
+        
+        # Create a synthetic gravity-compensated vector along the original direction
+        if raw_mag > 0.001:
+            scale = compensated_mag / raw_mag
+            ax_comp = ax * scale
+            ay_comp = ay * scale
+            az_comp = az * scale
+        else:
+            ax_comp, ay_comp, az_comp = 0.0, 0.0, 0.0
+        
+        result = engine.assess(ax_comp, ay_comp, az_comp)
+        if result.risk_status == "High":
+            return True
     return False
 
 
@@ -265,12 +330,16 @@ def validate_dataset(
     spike_min_samples: int,
     stillness_min_samples: int,
     window_samples: int,
+    max_files: int = 100,
 ) -> ValidationResult:
     """Run validation on SisFall dataset with given thresholds."""
     result = ValidationResult()
     
-    fall_dir = os.path.join(data_dir, "D")
-    adl_dir = os.path.join(data_dir, "A")
+    fall_files, adl_files = collect_sisfall_files(data_dir)
+    
+    # Limit files for faster validation
+    fall_files = fall_files[:max_files]
+    adl_files = adl_files[:max_files]
     
     engine = DetectionEngine(
         spike_threshold=spike_threshold,
@@ -280,39 +349,31 @@ def validate_dataset(
         spike_to_stillness_window=window_samples,
     )
     
-    # Process fall sequences (D/)
-    if os.path.isdir(fall_dir):
-        for fname in sorted(os.listdir(fall_dir)):
-            fpath = os.path.join(fall_dir, fname)
-            if not os.path.isfile(fpath) or fname.startswith("."):
-                continue
-            samples = load_sequence(fpath)
-            if len(samples) < 10:
-                continue
-            result.total_sequences += 1
-            result.total_fall += 1
-            detected = classify_sequence(samples, engine)
-            if detected:
-                result.true_positives += 1
-            else:
-                result.false_negatives += 1
+    # Process fall sequences
+    for fpath in fall_files:
+        samples = load_sisfall_sequence(fpath)
+        if len(samples) < 10:
+            continue
+        result.total_sequences += 1
+        result.total_fall += 1
+        detected = classify_sequence(samples, engine)
+        if detected:
+            result.true_positives += 1
+        else:
+            result.false_negatives += 1
     
-    # Process ADL sequences (A/)
-    if os.path.isdir(adl_dir):
-        for fname in sorted(os.listdir(adl_dir)):
-            fpath = os.path.join(adl_dir, fname)
-            if not os.path.isfile(fpath) or fname.startswith("."):
-                continue
-            samples = load_sequence(fpath)
-            if len(samples) < 10:
-                continue
-            result.total_sequences += 1
-            result.total_adl += 1
-            detected = classify_sequence(samples, engine)
-            if detected:
-                result.false_positives += 1
-            else:
-                result.true_negatives += 1
+    # Process ADL sequences
+    for fpath in adl_files:
+        samples = load_sisfall_sequence(fpath)
+        if len(samples) < 10:
+            continue
+        result.total_sequences += 1
+        result.total_adl += 1
+        detected = classify_sequence(samples, engine)
+        if detected:
+            result.false_positives += 1
+        else:
+            result.true_negatives += 1
     
     return result
 
@@ -354,6 +415,7 @@ def sweep_thresholds(args):
                 spike_min_samples=args.min_samples,
                 stillness_min_samples=args.stillness_samples,
                 window_samples=args.window_samples,
+                max_files=200,
             )
             lines.append(
                 f"| {sp:.1f} | {st:.1f} | "

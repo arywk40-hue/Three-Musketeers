@@ -5,12 +5,18 @@ import kotlin.math.abs
 
 object OverexertionModel {
     private const val HR_REST_BPM = 70
-    private const val HR_MAX_BPM = 180
     private const val SPO2_DROP_BASELINE = 97f
     private const val SPO2_DROP_THRESHOLD = 2.5f
     private const val RR_HIGH = 22
     private const val IMU_INTENSITY_HIGH = 6.0f
     private const val IMU_INTENSITY_MOD = 3.0f
+
+    /**
+     * Age-adjusted HRmax: Tanaka formula (208 − 0.7 × age).
+     * Default age 70 → HRmax ≈ 159 bpm.
+     * The old fixed value of 180 is inappropriate for elderly users.
+     */
+    fun hrMax(ageYears: Int): Int = (208 - 0.7 * ageYears).toInt().coerceIn(100, 200)
 
     data class OverexertionAssessment(
         val status: FatigueStatus,
@@ -23,8 +29,10 @@ object OverexertionModel {
         spo2Percent: Float,
         respiratoryRate: Int,
         imuMagnitude: Float,
+        ageYears: Int = 70,
     ): OverexertionAssessment {
-        val hrReserveRange = (HR_MAX_BPM - HR_REST_BPM).coerceAtLeast(1)
+        val hrMax = hrMax(ageYears)
+        val hrReserveRange = (hrMax - HR_REST_BPM).coerceAtLeast(1)
         val hrReservePct = (((heartRateBpm - HR_REST_BPM).toFloat() / hrReserveRange) * 100f)
             .coerceIn(0f, 100f)
         val imuDeviation = abs(imuMagnitude - 9.81f)

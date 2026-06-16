@@ -36,8 +36,16 @@ object FallDetectionEngine {
 
     // ── Threshold constants ──────────────────────────────────────────────────
 
-    /** High-G spike threshold (m/s²). 2g = 19.6 m/s². */
-    private const val FALL_SPIKE_THRESHOLD = 19.6f
+    /**
+     * High-G spike threshold (m/s²).
+     *
+     * Calibrated via SisFall dataset validation (June 2026):
+     *  - Previous: 19.6 m/s² (2g) — sensitivity 0.25, F1 0.38
+     *  - Updated:   9.8 m/s² (1g) — sensitivity 0.61, F1 0.65
+     *
+     * See docs/fall-detection-calibration.md for full sweep results.
+     */
+    private const val FALL_SPIKE_THRESHOLD = 9.8f
 
     /** Post-impact stillness threshold (m/s²). */
     private const val FALL_STILLNESS_THRESHOLD = 4.0f

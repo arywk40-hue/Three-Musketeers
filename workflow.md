@@ -301,7 +301,10 @@ TEG patch, solar panels, and piezo insert must be **removable** before washing. 
 - [ ] Battery/readiness screen remains stable during the demo
 
 ### Demo script (from PDF — expanded)
-1. Wear or clip the device. Show Samsung Health recognised the device where supported
+1. Wear or clip the device. Open the Readiness tab — show BLE connected to "ElderCare_v1".
+   Samsung Health bridge will show "AAR missing" or "Partner approval required" — explain this
+   is the expected state before the 4–8 week Samsung partner approval; the app falls back to
+   local dashboard mode transparently.
 2. Live ECG waveform on phone screen
 3. SpO2 + HR updating
 4. Trigger staged fall event -> Safety screen changes to high risk
