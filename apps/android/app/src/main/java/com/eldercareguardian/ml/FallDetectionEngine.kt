@@ -1,6 +1,7 @@
 package com.eldercareguardian.ml
 
 import com.eldercareguardian.data.RiskStatus
+import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
@@ -11,7 +12,7 @@ import kotlin.math.sqrt
  * A fall produces three distinct phases in the IMU signal:
  *
  *  Phase A — Pre-fall activity: normal movement (5–15 m/s² magnitude).
- *  Phase B — Impact spike: sudden high-G event > FALL_SPIKE_THRESHOLD (typically 2.0g = 19.6 m/s²).
+ *  Phase B — Impact spike: sudden high-G event > FALL_SPIKE_THRESHOLD (calibrated to 7.5 m/s² deviation-from-gravity).
  *  Phase C — Post-impact stillness: person lying on floor, magnitude drops < STILLNESS_THRESHOLD.
  *
  * A SINGLE sample check (the old implementation) catches only Phase B and generates
@@ -90,17 +91,28 @@ object FallDetectionEngine {
 
         val ax = imuWindow[0]; val ay = imuWindow[1]; val az = imuWindow[2]
         val mag = sqrt(ax * ax + ay * ay + az * az)
+        // SisFall validation was run on gravity-compensated data (ESP32 includes gravity).
+        // Subtract 1g to get deviation-from-gravity for threshold comparison.
+        val deviation = abs(mag - 9.81f)
 
         // Update circular window
         if (magnitudeWindow.size >= WINDOW_SIZE) magnitudeWindow.removeFirst()
-        magnitudeWindow.addLast(mag)
+        magnitudeWindow.addLast(deviation)
 
         // ── Phase B: Impact spike detection ──────────────────────────────────
-        if (mag > FALL_SPIKE_THRESHOLD) {
+        // Phase C (stillness) is nested in the else — spike and stillness are
+        // mutually exclusive since stillness_threshold > spike_threshold.
+        if (deviation > FALL_SPIKE_THRESHOLD) {
             consecutiveSpikeSamples++
             consecutiveStillSamples = 0
         } else {
             consecutiveSpikeSamples = 0
+            // ── Phase C: Post-impact stillness detection ────────────────────────
+            if (deviation < FALL_STILLNESS_THRESHOLD) {
+                consecutiveStillSamples++
+            } else {
+                consecutiveStillSamples = 0
+            }
         }
 
         if (consecutiveSpikeSamples >= SPIKE_MIN_SAMPLES && !spikeDetected) {
@@ -118,13 +130,6 @@ object FallDetectionEngine {
             }
         }
 
-        // ── Phase C: Post-impact stillness detection ──────────────────────────
-        if (mag < FALL_STILLNESS_THRESHOLD) {
-            consecutiveStillSamples++
-        } else {
-            consecutiveStillSamples = 0
-        }
-
         // ── Score calculation ─────────────────────────────────────────────────
         val score = when {
             // Both spike AND stillness confirmed within the window → high confidence fall
@@ -132,7 +137,7 @@ object FallDetectionEngine {
             // Spike detected but stillness not yet confirmed → medium risk
             spikeDetected -> 0.45f
             // Prolonged stillness without prior spike → inactivity, not a fall (handled by InactivityMonitor)
-            consecutiveStillSamples >= STILLNESS_MIN_SAMPLES * 2 && mag < FALL_STILLNESS_THRESHOLD -> 0.20f
+            consecutiveStillSamples >= STILLNESS_MIN_SAMPLES * 2 && deviation < FALL_STILLNESS_THRESHOLD -> 0.20f
             else -> 0.05f
         }
 

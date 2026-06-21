@@ -24,3 +24,4 @@ ml/data/
 *.zip
 
 .DS_Store
+docs/github-ci-setup.md

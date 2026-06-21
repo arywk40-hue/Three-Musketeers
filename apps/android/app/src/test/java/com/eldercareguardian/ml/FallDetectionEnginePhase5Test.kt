@@ -18,7 +18,7 @@ class FallDetectionEnginePhase5Test {
     private fun spikeFrame(mag: Float = 22f): List<Float> =
         listOf(mag / 1.732f, mag / 1.732f, mag / 1.732f, 0f, 0f, 0f)
 
-    private fun stillFrame(mag: Float = 1.5f): List<Float> =
+    private fun stillFrame(mag: Float = 9.81f): List<Float> =
         listOf(0f, 0f, mag, 0f, 0f, 0f)
 
     @Test
@@ -61,9 +61,9 @@ class FallDetectionEnginePhase5Test {
         FallDetectionEngine.reset()
         FallDetectionEngine.assess(spikeFrame(22f))
         FallDetectionEngine.assess(spikeFrame(22f))
-        FallDetectionEngine.assess(stillFrame(1.5f))
-        FallDetectionEngine.assess(stillFrame(1.5f))
-        val result = FallDetectionEngine.assess(stillFrame(1.5f))
+        FallDetectionEngine.assess(stillFrame())
+        FallDetectionEngine.assess(stillFrame())
+        val result = FallDetectionEngine.assess(stillFrame())
         assertEquals(RiskStatus.High, result.riskStatus)
     }
 
@@ -72,9 +72,9 @@ class FallDetectionEnginePhase5Test {
         FallDetectionEngine.reset()
         FallDetectionEngine.assess(spikeFrame(22f))
         FallDetectionEngine.assess(spikeFrame(22f))
-        FallDetectionEngine.assess(stillFrame(1.5f))
-        FallDetectionEngine.assess(stillFrame(1.5f))
-        FallDetectionEngine.assess(stillFrame(1.5f))
+        FallDetectionEngine.assess(stillFrame())
+        FallDetectionEngine.assess(stillFrame())
+        FallDetectionEngine.assess(stillFrame())
         val afterReset = FallDetectionEngine.assess(normalFrame())
         assertEquals(RiskStatus.Low, afterReset.riskStatus)
     }
@@ -83,7 +83,7 @@ class FallDetectionEnginePhase5Test {
     fun `sustained stillness without prior spike does not return High`() {
         FallDetectionEngine.reset()
         repeat(10) {
-            val result = FallDetectionEngine.assess(stillFrame(1.5f))
+            val result = FallDetectionEngine.assess(stillFrame())
             assert(result.riskStatus != RiskStatus.High) {
                 "Expected non-High risk on stillness alone but got High at iteration $it"
             }
@@ -96,9 +96,9 @@ class FallDetectionEnginePhase5Test {
         FallDetectionEngine.assess(spikeFrame(22f))
         FallDetectionEngine.assess(spikeFrame(22f))
         repeat(10) { FallDetectionEngine.assess(normalFrame()) }
-        FallDetectionEngine.assess(stillFrame(1.5f))
-        FallDetectionEngine.assess(stillFrame(1.5f))
-        val result = FallDetectionEngine.assess(stillFrame(1.5f))
+        FallDetectionEngine.assess(stillFrame())
+        FallDetectionEngine.assess(stillFrame())
+        val result = FallDetectionEngine.assess(stillFrame())
         assert(result.riskStatus != RiskStatus.High) {
             "Expected non-High after window expiry but got ${result.riskStatus}"
         }

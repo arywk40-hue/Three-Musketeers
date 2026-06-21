@@ -53,9 +53,9 @@ class FallDetectionEngineTest {
     fun `spike followed by stillness reaches High risk`() {
         FallDetectionEngine.assess(listOf(22f, 0f, 0f, 0f, 0f, 0f))
         FallDetectionEngine.assess(listOf(22f, 0f, 0f, 0f, 0f, 0f))
-        FallDetectionEngine.assess(listOf(0f, 0f, 1.5f, 0f, 0f, 0f))
-        FallDetectionEngine.assess(listOf(0f, 0f, 1.5f, 0f, 0f, 0f))
-        val result = FallDetectionEngine.assess(listOf(0f, 0f, 1.5f, 0f, 0f, 0f))
+        FallDetectionEngine.assess(listOf(0f, 0f, 9.81f, 0f, 0f, 0f))
+        FallDetectionEngine.assess(listOf(0f, 0f, 9.81f, 0f, 0f, 0f))
+        val result = FallDetectionEngine.assess(listOf(0f, 0f, 9.81f, 0f, 0f, 0f))
         assertEquals(RiskStatus.High, result.riskStatus)
     }
 
