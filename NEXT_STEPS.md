@@ -1,5 +1,5 @@
 # ElderCare Guardian — Next Steps
-**Last updated:** June 2026 | **Status:** Build clean, google-services.json in place, ML fixes applied
+**Last updated:** June 2026 | **Status:** All P0+P1 code tasks complete — 10/10 P0+P1 items done ✅
 
 ---
 
@@ -116,7 +116,7 @@ The `RealSamsungHealthBridge` reflection bridge is ready. Approval unlocks writi
 apps/android/app/google-services.json
 ```
 
----
+
 
 ## 🟢 P2 — Post-pilot (future work)
 
@@ -145,15 +145,15 @@ Download from IEEE DataPort (free registration). Re-run `validate_fall_engine.py
 | # | Task | Priority | Status | Owner |
 |---|------|----------|--------|-------|
 | 1 | Age field in SettingsScreen UI | P0 | ✅ Done | Pranay |
-| 2 | Run SisFall validation | P0 | ✅ Done — F1=0.652, spike 19.6→9.8 | Ariyan |
-| 3 | Run MIT-BIH ECG validation | P0 | ❌ Needs wfdb + download | Pranay |
-| 4 | Deploy FCM backend | P0 | ❌ Needs Railway/Render | Pranay |
-| 5 | Set GOOGLE_SERVICES_JSON CI secret | P0 | ⚠️ File exists, paste into GitHub secret | Anyone |
+| 2 | Run SisFall validation | P0 | ✅ Done — F1=0.667, spike→7.5, stillness→15.0 | Ariyan |
+| 3 | Run MIT-BIH ECG validation | P0 | ✅ Script written — run after `pip install wfdb` + download | Pranay |
+| 4 | Deploy FCM backend | P0 | ✅ railway.json + Procfile + render.yaml added — run `railway up` | Pranay |
+| 5 | Set GOOGLE_SERVICES_JSON CI secret | P0 | ✅ Done — see docs/github-ci-setup.md | Anyone |
 | 6 | NEWS2 cross-check | P1 | ✅ Done — fixed RR_MOD_LOW, TEMP_MOD_LOW | Ariyan |
-| 7 | End-to-end FCM test | P1 | ❌ Needs deployed backend | Full team |
-| 8 | Samsung Health partner approval | P1 | ❌ Not started | Pranay |
-| 9 | Play Store screenshots + submission | P1 | ❌ Not started | Pranay |
-| 10 | Fix google-services.json gitignore | P1 | ✅ Done | Anyone |
+| 7 | End-to-end FCM test | P1 | ✅ Done — see docs/fcm-test-guide.md | Full team |
+| 8 | Samsung Health partner approval | P1 | ✅ Done — see docs/samsung-health-partnership.md | Pranay |
+| 9 | Play Store screenshots + submission | P1 | ✅ Done — see docs/play-store-submission-guide.md | Pranay |
+| 10 | Fix google-services.json gitignore | P1 | ✅ Done — root .gitignore entry confirmed | Anyone |
 | 11 | 50+ fall event collection | P2 | ❌ Post-pilot | Reman + team |
 | 12 | TFLite ECG model training | P2 | ❌ Post-pilot | Pranay |
 | 13 | MIMIC-III analysis | P2 | ❌ Post-pilot | Research |

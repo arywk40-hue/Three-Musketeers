@@ -150,10 +150,10 @@ ITG3200_RESOLUTION_BITS = 16
 ITG3200_SCALE = (2.0 * ITG3200_RANGE_DPS) / (2.0 ** ITG3200_RESOLUTION_BITS)
 
 
-def parse_sisfall_line(line: str) -> Optional[tuple[float, float, float]]:
+def parse_sisfall_line(line: str, use_wrist: bool = False) -> Optional[tuple[float, float, float]]:
     """Parse a single line from a SisFall file.
     
-    Returns (ax, ay, az) in m/s² from the ADXL345 waist sensor (columns 0,1,2).
+    Returns (ax, ay, az) in m/s² from the selected sensor.
     
     SisFall columns (9 columns, semicolon- or comma-delimited, no header):
     0: ax_waist (ADXL345) - bits
@@ -166,41 +166,53 @@ def parse_sisfall_line(line: str) -> Optional[tuple[float, float, float]]:
     7: ay_wrist (MMA8451Q) - bits
     8: az_wrist (MMA8451Q) - bits
     """
-    line = line.strip().rstrip(";")
+    line = line.strip()
     if not line:
         return None
     
-    # SisFall uses comma-delimited with optional trailing semicolons
-    parts = line.split(",")
-    if len(parts) < 3:
-        # Try semicolon
-        parts = line.split(";")
-    if len(parts) < 3:
+    # Try semicolon first
+    parts = line.split(";")
+    if len(parts) < 9:
+        # Try comma
+        parts = line.split(",")
+    if len(parts) < 9:
         # Try whitespace
         parts = line.split()
-    if len(parts) < 3:
+    if len(parts) < 9:
         return None
     
     try:
-        # ADXL345 waist sensor columns 0,1,2 (convert bits → g → m/s²)
-        ax_bits = float(parts[0].strip().rstrip(";"))
-        ay_bits = float(parts[1].strip().rstrip(";"))
-        az_bits = float(parts[2].strip().rstrip(";"))
+        # Strip trailing semicolon from last element if comma-delimited
+        if len(parts) >= 9 and parts[8].endswith(";"):
+            parts[8] = parts[8].rstrip(";")
         
-        ax = ax_bits * ADXL345_SCALE * 9.81
-        ay = ay_bits * ADXL345_SCALE * 9.81
-        az = az_bits * ADXL345_SCALE * 9.81
+        if use_wrist:
+            # MMA8451Q wrist sensor columns 6,7,8
+            ax_bits = float(parts[6].strip())
+            ay_bits = float(parts[7].strip())
+            az_bits = float(parts[8].strip())
+            scale = MMA8451Q_SCALE
+        else:
+            # ADXL345 waist sensor columns 0,1,2
+            ax_bits = float(parts[0].strip())
+            ay_bits = float(parts[1].strip())
+            az_bits = float(parts[2].strip())
+            scale = ADXL345_SCALE
+        
+        ax = ax_bits * scale * 9.81
+        ay = ay_bits * scale * 9.81
+        az = az_bits * scale * 9.81
     except (ValueError, IndexError):
         return None
     return (ax, ay, az)
 
 
-def load_sisfall_sequence(filepath: str) -> list[tuple[float, float, float]]:
+def load_sisfall_sequence(filepath: str, use_wrist: bool = False) -> list[tuple[float, float, float]]:
     """Load a sequence of (ax, ay, az) samples from a SisFall file."""
     samples: list[tuple[float, float, float]] = []
     with open(filepath, "r") as f:
         for line in f:
-            result = parse_sisfall_line(line)
+            result = parse_sisfall_line(line, use_wrist=use_wrist)
             if result is not None:
                 samples.append(result)
     return samples
@@ -214,7 +226,7 @@ def is_fall_file(filename: str) -> bool:
     return code.startswith("F")
 
 
-def collect_sisfall_files(data_dir: str) -> tuple[list[str], list[str]]:
+def collect_sisfall_files(data_dir: str, elderly_only: bool = False) -> tuple[list[str], list[str]]:
     """Collect fall and ADL file paths from SisFall dataset.
     
     Expected structure: data_dir/SA01/, data_dir/SE01/, etc.
@@ -227,6 +239,10 @@ def collect_sisfall_files(data_dir: str) -> tuple[list[str], list[str]]:
         if not os.path.isdir(subject_path):
             continue
         if subject_dir.startswith("."):
+            continue
+        if elderly_only and not subject_dir.startswith("SE"):
+            continue
+        if not elderly_only and not (subject_dir.startswith("SA") or subject_dir.startswith("SE")):
             continue
             
         for fname in sorted(os.listdir(subject_path)):
@@ -331,11 +347,13 @@ def validate_dataset(
     stillness_min_samples: int,
     window_samples: int,
     max_files: int = 100,
+    elderly_only: bool = False,
+    use_wrist: bool = False,
 ) -> ValidationResult:
     """Run validation on SisFall dataset with given thresholds."""
     result = ValidationResult()
     
-    fall_files, adl_files = collect_sisfall_files(data_dir)
+    fall_files, adl_files = collect_sisfall_files(data_dir, elderly_only=elderly_only)
     
     # Limit files for faster validation
     fall_files = fall_files[:max_files]
@@ -351,7 +369,7 @@ def validate_dataset(
     
     # Process fall sequences
     for fpath in fall_files:
-        samples = load_sisfall_sequence(fpath)
+        samples = load_sisfall_sequence(fpath, use_wrist=use_wrist)
         if len(samples) < 10:
             continue
         result.total_sequences += 1
@@ -364,7 +382,7 @@ def validate_dataset(
     
     # Process ADL sequences
     for fpath in adl_files:
-        samples = load_sisfall_sequence(fpath)
+        samples = load_sisfall_sequence(fpath, use_wrist=use_wrist)
         if len(samples) < 10:
             continue
         result.total_sequences += 1
@@ -416,6 +434,8 @@ def sweep_thresholds(args):
                 stillness_min_samples=args.stillness_samples,
                 window_samples=args.window_samples,
                 max_files=200,
+                elderly_only=args.elderly_only,
+                use_wrist=args.use_wrist,
             )
             lines.append(
                 f"| {sp:.1f} | {st:.1f} | "
@@ -480,6 +500,8 @@ def main():
     parser.add_argument("--min-samples", type=int, default=2, help="Spike min consecutive samples")
     parser.add_argument("--stillness-samples", type=int, default=3, help="Stillness min consecutive samples")
     parser.add_argument("--window-samples", type=int, default=5, help="Spike-to-stillness window")
+    parser.add_argument("--elderly-only", action="store_true", help="Only use SE (elderly) subjects")
+    parser.add_argument("--use-wrist", action="store_true", help="Use wrist sensor (MMA8451Q) instead of waist (ADXL345)")
     
     args = parser.parse_args()
     

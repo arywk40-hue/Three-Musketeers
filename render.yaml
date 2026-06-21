@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: eldercare-guardian-backend
+    runtime: node
+    rootDir: apps/backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "3001"
+      - key: FCM_SERVICE_ACCOUNT_JSON
+        sync: false   # Set manually in Render dashboard → Environment
+    autoDeploy: true

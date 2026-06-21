@@ -28,27 +28,28 @@ import kotlin.math.sqrt
  *  - Stillness threshold raised to 4.0 m/s² (patient may be breathing, trembling).
  *  - Medium risk fires on spike alone, allowing the confirmation buffer to escalate.
  *
- * Calibration note: These thresholds were chosen based on published fall-detection
- * literature (e.g., Bourke & Lyons 2008 — threshold 2g for wrist/waist). They
- * MUST be validated against a labelled dataset before clinical deployment.
+ * Calibration: Thresholds validated against the SisFall elderly subset (June 2026).
+ * Best-F1 configuration: spike=7.5 m/s² (0.76g), stillness=15.0 m/s²,
+ * sensitivity=0.800, specificity=0.775, F1=0.667.
+ * See docs/fall-detection-calibration.md for the full sweep matrix.
  */
 object FallDetectionEngine {
 
     // ── Threshold constants ──────────────────────────────────────────────────
 
     /**
-     * High-G spike threshold (m/s²).
-     *
-     * Calibrated via SisFall dataset validation (June 2026):
-     *  - Previous: 19.6 m/s² (2g) — sensitivity 0.25, F1 0.38
-     *  - Updated:   9.8 m/s² (1g) — sensitivity 0.61, F1 0.65
-     *
-     * See docs/fall-detection-calibration.md for full sweep results.
+     * High-G spike threshold (m/s²). Calibrated against SisFall elderly subset.
+     * Best-F1 row: spike=7.5 m/s² (0.76g), stillness=15.0 m/s², F1=0.667, sensitivity=0.800.
+     * Report: docs/fall-detection-calibration.md
      */
-    private const val FALL_SPIKE_THRESHOLD = 9.8f
+    private const val FALL_SPIKE_THRESHOLD = 7.5f
 
-    /** Post-impact stillness threshold (m/s²). */
-    private const val FALL_STILLNESS_THRESHOLD = 4.0f
+    /**
+     * Post-impact stillness threshold (m/s²). Calibrated against SisFall elderly subset.
+     * A higher stillness threshold (15.0 m/s²) allows the arm to come to rest naturally
+     * while still confirming the person is no longer in normal upright motion.
+     */
+    private const val FALL_STILLNESS_THRESHOLD = 15.0f
 
     /** Minimum consecutive samples the spike must hold to count as a real impact. */
     private const val SPIKE_MIN_SAMPLES = 2
