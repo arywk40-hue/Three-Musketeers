@@ -184,11 +184,17 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
         initialValue = null,
     )
 
-    init {
-        // Start foreground service for persistent BLE monitoring
-        val appCtx = getApplication<Application>()
-        appCtx.startForegroundService(ElderCareMonitorService.startIntent(appCtx))
+    private var _serviceStarted = false
 
+    fun onUiVisible() {
+        if (!_serviceStarted) {
+            _serviceStarted = true
+            val appCtx = getApplication<Application>()
+            appCtx.startForegroundService(ElderCareMonitorService.startIntent(appCtx))
+        }
+    }
+
+    init {
         // Observe patients from Room
         viewModelScope.launch {
             patientDao.getAll().collect { entities ->
