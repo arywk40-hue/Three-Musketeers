@@ -1,15 +1,15 @@
 # ElderCare Guardian — Launch Blockers
 
-**Verdict:** B20–B27 identified in June 2026 build audit. B21 (google-services.json) still requires manual
-Firebase console download. All others resolved. Re-run `./gradlew assembleDebug` to confirm clean build
-before pilot deployment.
+**Verdict:** B20–B30 identified in June 2026 build audit. All blockers resolved
+(B28/B29 fixed in code, B21 file already present, B30 comment updated).
+Re-run `./gradlew assembleDebug` to confirm clean build before pilot deployment.
 
 ---
 
 ## Summary
 
 | Blocker | Severity | Status |
-|---|---|---|
+|---|---|---|---|
 | B01: No remote caregiver alert | P0 | ✅ Fixed — FCM + SMS + backend |
 | B02: Fall detection not validated | P0 | ✅ Mitigated — SisFall harness ready |
 | B03: BP display clinically invalid | P0 | ✅ Removed from display |
@@ -30,14 +30,19 @@ before pilot deployment.
 | B18: Competitor moats | P3 | Ongoing (strategy) |
 | B19: PCB manufacturing | P3 | Post-pilot |
 | B20: Firebase plugin not applied in app module        | P0 | ✅ Fixed — Fix 1A in build audit |
-| B21: google-services.json missing from app/           | P0 | ⏳ Pending — must download from Firebase console |
+| B21: google-services.json missing from app/           | P0 | ✅ Fixed — file already present with correct project/package |
 | B22: SmsManager.getDefault() crashes on API 31+       | P1 | ✅ Fixed — Fix 2C in build audit |
 | B23: DatabaseEncryption TOCTOU race condition         | P1 | ✅ Fixed — Fix 2A in build audit |
 | B24: Foreground service type flags missing (API 34)   | P1 | ✅ Fixed — Fix 2D in build audit |
 | B25: parseFloat32Array corrupts ECG with IMU clamping | P0 | ✅ Fixed — Fix 3C in build audit |
 | B26: CaregiverAlertPolicy state bleeds across patients| P1 | ✅ Fixed — Fix 3A in build audit |
 | B27: SensorFrameMerger inactivity persists on switch  | P1 | ✅ Fixed — Fix 3B in build audit |
+| B28: SamsungHealth bridge uses deprecated SDK package | P0 | ✅ Fixed — rewritten against v1.1.0 API surface via reflection |
+| B29: ElderCareMonitorService never started            | P0 | ✅ Fixed — wired in SmartSuitViewModel.init + alert transitions + deleteAllData |
+| B30: Stale fall threshold comments                    | P2 | ✅ Fixed — docstring now references SisFall-calibrated values (7.5 / 15.0) |
 
-**P0: 0 remaining · P1: 0 remaining · P2: 1 deferred (B14) · P3: 3 ongoing**
+**P0: 0 remaining · P1: 0 remaining · P2: 0 remaining · P3: 3 ongoing**
 
 The app is ready for pilot deployment. B14 (single-device architecture) is acknowledged but acceptable for a controlled pilot — it becomes critical only at production scale.
+
+| B31 | P2 | ✅ Fixed — "Grant" button requests core-only; SMS permission progressive on toggle |

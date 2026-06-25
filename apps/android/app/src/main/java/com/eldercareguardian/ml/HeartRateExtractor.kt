@@ -92,14 +92,6 @@ object HeartRateExtractor {
         return kotlin.math.sqrt(mean).toInt()
     }
 
-    @Suppress("unused")
-    fun detectBaselineWander(ecgSamples: List<Float>): Float {
-        if (ecgSamples.isEmpty()) return 0f
-        var sum = 0.0
-        for (s in ecgSamples) sum += abs(s)
-        return (sum / ecgSamples.size).toFloat()
-    }
-
     private fun subtractBaseline(samples: List<Float>, window: Int): FloatArray {
         val out = FloatArray(samples.size)
         var sum = 0f

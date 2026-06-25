@@ -43,7 +43,7 @@ app.post('/notify', async (req: Request, res: Response) => {
   const title = `ElderCare Guardian — ${level}`;
   const body = `${patientName || 'Your patient'}: ${reason}`;
 
-  const result = await sendToToken(token, title, body);
+  const result = await sendToToken(token, title, body, level, reason, patientName || '');
   res.json(result);
 });
 

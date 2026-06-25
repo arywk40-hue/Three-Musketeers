@@ -40,18 +40,18 @@ Each track has independent timelines and can progress in parallel.
 5. Configure `signingConfig` in `build.gradle.kts` (local keystore.properties + CI env vars) ✅ Done
 
 ### Build Checklist
-- [ ] Add `id("com.google.gms.google-services")` to app/build.gradle.kts plugins block
-- [ ] Download `google-services.json` from Firebase console → place in `apps/android/app/`
-- [ ] Remove unused `id("kotlin-parcelize")` from app/build.gradle.kts
-- [ ] Add `apps/privacy-policy/` to `.github/workflows/pages.yml` paths so it deploys to GitHub Pages
+- [x] `id("com.google.gms.google-services")` already in app/build.gradle.kts plugins block
+- [x] `google-services.json` already in `apps/android/app/` (project `eldercare-58d1c`)
+- [x] `id("kotlin-parcelize")` already absent — never present in this build file
+- [x] `apps/privacy-policy/` already in `.github/workflows/pages.yml` paths trigger
 - [x] Enable R8 minification in `buildTypes.release`
 - [x] Create `proguard-rules.pro` with Room, SQLCipher, Gson rules
 - [x] Set `versionCode` auto-increment in CI (`VERSION_CODE`/`VERSION_NAME` env vars)
 - [x] CI release job: base64 keystore decode → `bundleRelease` with env-based signing
 - [x] Fill `AndroidManifest.xml` with `android:icon` — **done — done**
 - [x] Create adaptive app icon — **done — done**
-- [ ] Generate 512×512 PNG for Play Store (use Android Studio Image Asset Studio)
-- [ ] Write app description, screenshots for Play Store listing — docs/play-store-listing.md created, screenshots not captured
+- [x] 512×512 PNG generated at `docs/play-store-screenshots/icon-512.png`
+- [x] App description in `docs/play-store-listing.md`, 6 screenshots in `docs/play-store-screenshots/`
 - [x] Set `targetSdkVersion = 35` (required for new apps on Play)
 - [ ] Handle `SEND_SMS` permission — submit Play Store Declaration Form with:
   Use case: "Emergency caregiver SMS alert when patient falls or triggers SOS.
@@ -64,9 +64,9 @@ Each track has independent timelines and can progress in parallel.
 - [x] Privacy policy page created at `apps/privacy-policy/index.html` — done
 - [x] Terms of Service page created at `apps/tos/index.html` — done
 - [x] GitHub Pages deploy workflow at `.github/workflows/pages.yml` — done
-- [ ] Host privacy policy on GitHub Pages (`gh-pages` branch) — workflow auto-deploys apps/tos/, but apps/privacy-policy not yet in pages.yml path
-- [ ] Add privacy policy URL to Play Store listing
-- [ ] Add a Data Safety section (health data stored locally, not shared)
+- [x] Privacy policy hosted via GitHub Pages (`pages.yml` workflow deploys both `apps/tos/` and `apps/privacy-policy/`)
+- [ ] Add privacy policy URL to Play Store listing (manual: paste `https://<org>.github.io/privacy-policy/`)
+- [x] Data Safety section answers documented in `docs/play-store-listing.md`
 
 ### Timeline
 | Milestone | Duration | Status |
@@ -170,3 +170,104 @@ Under the Medical Devices Rules 2017 (India), the device may qualify as:
 - [ ] BLE connection stability: > 99% uptime over 2-hour test window
 - [ ] Caregiver alert delivery: 100% within 60 seconds of trigger
 - [ ] User wearability: > 80% of pilot users wear it > 8 hours/day
+
+
+# ElderCare Guardian — Deployment Audit & Implementation Roadmap
+
+**Date:** June 21, 2026
+**Scope:** Cross-checked `DEPLOYMENT_PLAN.md`, `NEXT_STEPS.md`, `LAUNCH_BLOCKERS.md`, and `IMPLEMENTATION_COMPLETE.md` against the actual Android source (Compose UI, BLE stack, ML engines, Samsung bridge, FCM, service layer).
+
+---
+
+## Verdict
+
+The codebase is genuinely far along — Compose UI, BLE GATT client, Room+SQLCipher, the rule-based ML engine stack, FCM, CI, and firmware are all real, working, and reasonably well tested. But "pilot-ready," the label your own docs use, overstates where things actually are, for two reasons:
+
+1. **Your docs disagree with each other.** `DEPLOYMENT_PLAN.md` (Track A) says the Play Store dev account isn't created yet and screenshots aren't captured. `IMPLEMENTATION_COMPLETE.md`, dated the same day, says "✅ All ready — 6 screenshots captured." Same pattern with Samsung Health: `docs/samsung-health-partnership.md`'s own header says "Status: ⏳ Not started," but `NEXT_STEPS.md`'s summary table marks that task "✅ Done." In each case what's actually finished is a *runbook* — code-side prep plus a step-by-step guide — not the manual real-world action itself (creating a Play developer account, filing the Samsung partnership form, running a live two-phone FCM test).
+
+2. **Code review found two issues your blocker tracking (B01–B27) doesn't have**, one of which undermines the app's core safety claim. Details below.
+
+Net: this reads as "code-complete, demo-ready," not "pilot-ready." That's still a strong place to be — the gap to an actual pilot is now mostly manual ops plus two focused code fixes, not new feature work.
+
+---
+
+## New issues (continuing your B-numbering from `LAUNCH_BLOCKERS.md`)
+
+| ID | Severity | Issue |
+|---|---|---|
+| B28 | P0 | `SamsungHealthBridgeProvider.create()` and `RealSamsungHealthBridge.checkSdkAvailability()` both probe for `com.samsung.android.sdk.healthdata.HealthDataService` — the **deprecated** SDK package your own `dependencies.md` warns against using. The current Data SDK v1.1.0 package is `com.samsung.android.sdk.health.data` (confirmed by `architecture.md`'s own sample code). Because the class name is wrong, the bridge can **never** leave `NeedsSdkAar`/NoOp state — not even with the real AAR installed and partner approval granted. `RealSamsungHealthBridge.kt`'s whole implementation also follows the *old* SDK's pattern (`connect()` + `ConnectionListener` + `requestPermissions()`/`ResultListener`), not the new SDK's pattern (`HealthDataService.getStore(context)` → `Permission.of(...)` → `insertData()`) that's documented elsewhere in your own repo. This needs a rewrite, not a patch — and it means the "Developer Mode reflection bridge works for pilot" fallback mentioned in your risk table is currently also non-functional. |
+| B29 | P0 | `ElderCareMonitorService` (the foreground service for 24/7 background BLE monitoring) is fully implemented — notification channels, alert-level escalation, stop action — but is **never started**. `MainActivity.onCreate()` only renders the consent/dashboard Compose tree; `SmartSuitViewModel` imports the service class but never calls `startForegroundService()` / `ContextCompat.startForegroundService()` anywhere in the provided code. Right now background monitoring is inert: once the screen turns off or the app backgrounds, Android is free to kill the process and nothing keeps BLE/fall-detection alive. This is the headline safety claim in your README — fix this before anything else. |
+| B30 | P2 | `FallDetectionEngine.kt`'s class docstring still cites the pre-calibration thresholds (spike=19.6 m/s², stillness=4.0 m/s²) while the actual constants are the SisFall-calibrated values (7.5 / 15.0). No functional bug — just a stale comment that'll mislead the next Claude Code session reading the file for context. |
+| B31 | P2 | `SmartSuitPermissions.kt` documents `SEND_SMS` as an "enhanced, progressively-disclosed" permission, requested only once SMS alerts are turned on. In practice the "Grant" button in `SmartSuitApp.kt` calls `requiredRuntimePermissions()`, which is core+enhanced combined — so SMS gets requested up front regardless of whether the user ever enables SMS alerts. Minor, but contradicts the stated design. |
+
+---
+
+## P0 — before anything else
+
+- [x] **B21** — `google-services.json` already present at `apps/android/app/google-services.json` with correct project `eldercare-58d1c` and package `com.eldercareguardian`.
+- [x] **B29** — `ElderCareMonitorService` now starts from `SmartSuitViewModel.init`, `updateAlertStatus()` is called on every alert transition in the frame-collection loop, and the service stops when `deleteAllData()` triggers.
+- [x] **B28** — `RealSamsungHealthBridge.kt` rewritten against the v1.1.0 API surface (`com.samsung.android.sdk.health.data` package). Uses `HealthDataService.getStore(context)` → `Permission.of(DataTypes.X, AccessType.WRITE)` → `HealthDataPoint.builder()` → `healthDataStore.insertData(request)`, all via reflection. `SamsungHealthBridgeProvider.create()` checks the correct package name.
+
+## P1 — verify these are *actually* done, not just documented
+
+| Task | What your docs claim | What to actually verify |
+|---|---|---|
+| FCM end-to-end test | "✅ Done — see docs/fcm-test-guide.md" | That's a test *procedure*, not a test *result*. Run it on two real phones per the guide and confirm the push actually lands within 60s. |
+| Samsung Health partnership | NEXT_STEPS.md: "✅ Done" / samsung-health-partnership.md: "⏳ Not started" | Submit the real partnership form at developer.samsung.com — the 4–8 week clock hasn't started until you do. Fix B28 first, or the bridge won't be able to use the approval once it arrives. |
+| Play Store submission | IMPLEMENTATION_COMPLETE.md: "6 screenshots captured, all ready" / DEPLOYMENT_PLAN.md: "screenshots not captured, dev account not created" | Check `docs/play-store-screenshots/` directly. If it's empty, capture the 6 screens on a Pixel 7 Pro API 35 emulator per `docs/play-store-listing.md`, then create the $25 developer account (24–48h approval wait). |
+| google-services.json CI secret | "✅ Done" | Probably fine — just re-confirm the `GOOGLE_SERVICES_JSON` GitHub secret matches the file content once B21 is fixed, so it doesn't go stale. |
+
+## P2 — cleanup, not blocking pilot
+
+- [x] B30 — Updated the stale threshold comment in `FallDetectionEngine.kt` to reflect the SisFall-calibrated values (7.5 / 15.0).
+- [x] B31 — "Grant" button now requests core permissions only; SMS permission requested progressively when the SMS toggle is enabled in Settings.
+- [x] Added a `BootReceiver` (`.receiver.BootReceiver`) for `BOOT_COMPLETED` that restarts `ElderCareMonitorService` after a device reboot, with `RECEIVE_BOOT_COMPLETED` permission and manifest entry.
+- [x] `FcmTokenRefreshService.onMessageReceived()` now logs incoming data and notification payloads for pilot debugging. System-tray auto-display of notification payloads is sufficient for pilot.
+
+---
+
+## Ready-to-paste Claude Code prompts
+
+**Batch 1 — P0 code fixes:**
+```
+Fix three issues in apps/android:
+
+1. ElderCareMonitorService (apps/android/app/src/main/java/com/eldercareguardian/service/ElderCareMonitorService.kt)
+   is fully implemented but never started. Wire it to start via
+   ContextCompat.startForegroundService() once DPDPA consent is granted in
+   MainActivity (or from SmartSuitViewModel's init block), and call
+   updateAlertStatus() whenever the alert level changes in the ViewModel's
+   frame-collection loop so the persistent notification stays in sync.
+   Add a stop call when DataDeleter.deleteAllData() runs.
+
+2. SamsungHealthBridgeProvider.create() (samsung/SamsungHealthBridge.kt) and
+   RealSamsungHealthBridge.checkSdkAvailability() (samsung/RealSamsungHealthBridge.kt)
+   both check for the deprecated package com.samsung.android.sdk.healthdata.HealthDataService.
+   The current Samsung Health Data SDK v1.1.0 package is
+   com.samsung.android.sdk.health.data — see architecture.md's sample code for the
+   real API surface (HealthDataService.getStore(context), Permission.of(DataTypes.X,
+   AccessType.Y), healthDataStore.insertData(request)). Rewrite RealSamsungHealthBridge.kt
+   against that surface via reflection (keep it AAR-optional, same pattern as today),
+   fixing the package name everywhere it appears.
+
+3. google-services.json is missing from apps/android/app/. Walk me through getting
+   a fresh one from the Firebase console for project eldercare-58d1c and confirm
+   ./gradlew assembleDebug succeeds after it's added.
+
+Run ./gradlew assembleDebug and the existing test suite after each fix to confirm
+nothing regresses.
+```
+
+**Batch 2 — P2 cleanup:**
+```
+Two small fixes in apps/android:
+
+1. FallDetectionEngine.kt's class docstring cites stale pre-calibration thresholds
+   (spike=19.6, stillness=4.0). Update it to match the actual SisFall-calibrated
+   constants (FALL_SPIKE_THRESHOLD=7.5f, FALL_STILLNESS_THRESHOLD=15.0f) and reference
+   docs/fall-detection-calibration.md.
+
+2. Add a BroadcastReceiver for android.intent.action.BOOT_COMPLETED that restarts
+   ElderCareMonitorService after device reboot, with the matching manifest entry
+   and RECEIVE_BOOT_COMPLETED permission.
+```

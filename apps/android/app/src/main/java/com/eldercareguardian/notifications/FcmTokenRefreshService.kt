@@ -17,7 +17,23 @@ class FcmTokenRefreshService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
-        // FCM data messages are handled here in a future session;
-        // for now, the backend is used only for push notifications.
+        // Notification payloads are auto-displayed by the system tray when
+        // the app is backgrounded. Data payloads arrive here. For the pilot,
+        // we log them for debugging; future sessions may add custom handling
+        // (e.g. triggering an in-app alert overlay when the app is foregrounded).
+        val data = message.data
+        if (data.isNotEmpty()) {
+            android.util.Log.i(
+                "FcmTokenRefreshService",
+                "FCM data message received: alertLevel=${data["alertLevel"]}, " +
+                    "reason=${data["reason"]}, patient=${data["patientName"]}"
+            )
+        }
+        message.notification?.let { notification ->
+            android.util.Log.i(
+                "FcmTokenRefreshService",
+                "FCM notification: title=${notification.title}, body=${notification.body}"
+            )
+        }
     }
 }

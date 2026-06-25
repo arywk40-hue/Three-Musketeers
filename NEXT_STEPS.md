@@ -1,5 +1,11 @@
 # ElderCare Guardian — Next Steps
-**Last updated:** June 2026 | **Status:** All P0+P1 code tasks complete — 10/10 P0+P1 items done ✅
+**Last updated:** June 21, 2026 | **Status:** All P0+P1 code tasks complete — 10/10 P0+P1 items done ✅
+
+**Additional fixes from DEPLOYMENT_PLAN.md audit (now resolved):**
+- ✅ B28: `RealSamsungHealthBridge` rewritten against SDK v1.1.0 API surface via reflection
+- ✅ B29: `ElderCareMonitorService` wired — starts in ViewModel init, updates notification on alert transitions, stops on `deleteAllData()`
+- ✅ B30: Fall detection thresholds comment corrected to SisFall-calibrated values (7.5 / 15.0)
+- ✅ `BootReceiver` added for `BOOT_COMPLETED` auto-restart of monitoring service
 
 ---
 

@@ -207,19 +207,22 @@ private data class PermissionController(
 @Composable
 private fun rememberPermissionController(): PermissionController {
     val context = LocalContext.current
+    // Only track core permissions for the main "Grant" button.
+    // Enhanced permissions (SMS, background location) are requested
+    // progressively when their features are enabled — see B31.
     var missingPermissions by remember {
-        mutableStateOf(SmartSuitPermissions.missingPermissions(context))
+        mutableStateOf(SmartSuitPermissions.missingPermissions(context, "core"))
     }
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
     ) {
-        missingPermissions = SmartSuitPermissions.missingPermissions(context)
+        missingPermissions = SmartSuitPermissions.missingPermissions(context, "core")
     }
 
     return PermissionController(
         missingPermissions = missingPermissions,
         requestPermissions = {
-            launcher.launch(SmartSuitPermissions.requiredRuntimePermissions().toTypedArray())
+            launcher.launch(SmartSuitPermissions.corePermissions().toTypedArray())
         },
     )
 }

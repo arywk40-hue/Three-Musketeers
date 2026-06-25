@@ -7,8 +7,6 @@ services:
     startCommand: npm start
     healthCheckPath: /health
     envVars:
-      - key: PORT
-        value: "3001"
       - key: FCM_SERVICE_ACCOUNT_JSON
         sync: false   # Set manually in Render dashboard → Environment
     autoDeploy: true

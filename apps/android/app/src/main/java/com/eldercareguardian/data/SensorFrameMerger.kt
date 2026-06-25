@@ -2,15 +2,11 @@ package com.eldercareguardian.data
 
 import com.eldercareguardian.ble.SmartSuitBleTelemetry
 import com.eldercareguardian.ml.CaregiverAlertPolicy
-import com.eldercareguardian.ml.DehydrationRiskModel
-import com.eldercareguardian.ml.EcgAnomalyDetector
 import com.eldercareguardian.ml.FallConfirmationBuffer
 import com.eldercareguardian.ml.FallDetectionEngine
 import com.eldercareguardian.ml.FallDetectionTfliteModel
-import com.eldercareguardian.ml.HeartRateExtractor
+import com.eldercareguardian.ml.HealthRiskPipeline
 import com.eldercareguardian.ml.InactivityMonitor
-import com.eldercareguardian.ml.OverexertionModel
-import com.eldercareguardian.ml.VitalsRiskMonitor
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -50,29 +46,20 @@ object SensorFrameMerger {
         val isFallActive = fall?.riskStatus == RiskStatus.High || fall?.riskStatus == RiskStatus.Medium
         inactivitySeconds = InactivityMonitor.assess(imuMagnitude, inactivitySeconds, isFallActive)
 
-        val heartRateFromEcg = if (ecgSamples.size == 256) {
-            HeartRateExtractor.extractRrIntervals(ecgSamples)
+        val assessment = if (ecgSamples.size == 256) {
+            HealthRiskPipeline.assess(
+                ecgSamples = ecgSamples,
+                heartRateBpm = heartRateBpm,
+                spo2Percent = spo2Percent,
+                respiratoryRate = respiratoryRate,
+                skinTempC = base.skinTempC,
+                sweatRatePercentPerMin = base.sweatRatePercentPerMin,
+                imuMagnitude = imuMagnitude,
+                patientAgeYears = patientAgeYears,
+            )
         } else {
             null
         }
-        val ecgAnomaly = if (ecgSamples.size == 256) {
-            EcgAnomalyDetector.assess(ecgSamples, heartRateBpm)
-        } else {
-            null
-        }
-        val vitalsRisk = VitalsRiskMonitor.assess(heartRateBpm, spo2Percent, respiratoryRate, base.skinTempC)
-        val dehydration = DehydrationRiskModel.assess(
-            sweatRatePercentPerMin = base.sweatRatePercentPerMin,
-            skinTempC = base.skinTempC,
-            heartRateBpm = heartRateBpm,
-        )
-        val overexertion = OverexertionModel.assess(
-            heartRateBpm = heartRateBpm,
-            spo2Percent = spo2Percent,
-            respiratoryRate = respiratoryRate,
-            imuMagnitude = imuMagnitude,
-            ageYears = patientAgeYears,
-        )
 
         val posture = when (fall?.riskStatus) {
             RiskStatus.High -> PostureStatus.Bad
@@ -97,13 +84,13 @@ object SensorFrameMerger {
             inactivityMinutes = InactivityMonitor.toMinutes(inactivitySeconds),
             fallRisk = confirmedFallRisk ?: base.fallRisk,
             posture = posture,
-            fatigue = overexertion.status,
-            dehydration = dehydration.risk,
-            vitalsRisk = vitalsRisk.risk,
-            ecgAnomaly = ecgAnomaly?.status ?: base.ecgAnomaly,
-            rrIntervalsMs = heartRateFromEcg?.rrIntervalsMs ?: base.rrIntervalsMs,
+            fatigue = assessment?.overexertion.status ?: base.fatigue,
+            dehydration = assessment?.dehydration.risk ?: base.dehydration,
+            vitalsRisk = assessment?.vitals.risk ?: base.vitalsRisk,
+            ecgAnomaly = assessment?.ecg.status ?: base.ecgAnomaly,
+            rrIntervalsMs = assessment?.ecg.rrIntervalsMs ?: base.rrIntervalsMs,
             imuMagnitude = imuMagnitude,
-            hrReservePercent = overexertion.hrReservePercent,
+            hrReservePercent = assessment?.overexertion.hrReservePercent ?: base.hrReservePercent,
             batteryPercent = ble.batteryPercent ?: base.batteryPercent,
             spo2Quality = spo2Quality,
         )

@@ -108,9 +108,7 @@ class HealthRiskTfliteModel(context: Context, modelName: String = "health_risk.t
     }
 
     private fun fallback(frame: SensorFrame, ageYears: Int): HealthRiskResult {
-        val v = VitalsRiskMonitor.assess(frame.heartRateBpm, frame.spo2Percent, frame.respiratoryRate, frame.skinTempC)
-        val d = DehydrationRiskModel.assess(frame.sweatRatePercentPerMin, frame.skinTempC, frame.heartRateBpm)
-        val o = OverexertionModel.assess(frame.heartRateBpm, frame.spo2Percent, frame.respiratoryRate, frame.imuMagnitude, ageYears)
-        return HealthRiskResult(v.risk, d.risk, o.status, fromTflite = false)
+        val (vitals, dehydration, overexertion) = HealthRiskPipeline.assessRiskOnly(frame, ageYears)
+        return HealthRiskResult(vitals, dehydration, overexertion, fromTflite = false)
     }
 }

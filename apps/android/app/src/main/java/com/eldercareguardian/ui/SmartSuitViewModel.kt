@@ -185,6 +185,10 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
     )
 
     init {
+        // Start foreground service for persistent BLE monitoring
+        val appCtx = getApplication<Application>()
+        appCtx.startForegroundService(ElderCareMonitorService.startIntent(appCtx))
+
         // Observe patients from Room
         viewModelScope.launch {
             patientDao.getAll().collect { entities ->
@@ -222,6 +226,8 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
                 val event = alertHistoryTracker.onFrame(frame)
                 if (event != null) {
                     _alertHistory.value = alertHistoryTracker.prepend(_alertHistory.value, event)
+                    // Keep foreground service notification in sync
+                    ElderCareMonitorService.updateAlertStatus(getApplication(), event.level)
                     when (event.level) {
                         CaregiverAlertStatus.Emergency -> {
                             postEmergencyNotification(event)
@@ -402,6 +408,7 @@ class SmartSuitViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun deleteAllData() {
         val context = getApplication<Application>()
+        context.stopService(ElderCareMonitorService.stopIntent(context))
         viewModelScope.launch(Dispatchers.IO) {
             DataDeleter.deleteAllData(context, alertEventDao, healthDataDao, patientDao, consentPrefs)
         }

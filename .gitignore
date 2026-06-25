@@ -11,17 +11,12 @@ node_modules/
 
 # SisFall dataset (1.5 GB — keep out of repo)
 ml/data/
-ml/data/content/
 __pycache__/
 *.pyc
 
 # macOS
 .DS_Store
 
-# ML datasets
-ml/data/
+# ML artifacts
 *.npy
 *.zip
-
-.DS_Store
-docs/github-ci-setup.md

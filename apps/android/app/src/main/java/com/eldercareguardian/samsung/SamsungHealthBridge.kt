@@ -53,7 +53,7 @@ enum class SamsungHealthState {
 object SamsungHealthBridgeProvider {
     fun create(context: Context): SamsungHealthBridge {
         return try {
-            Class.forName("com.samsung.android.sdk.healthdata.HealthDataService")
+            Class.forName("com.samsung.android.sdk.health.data.HealthDataService")
             RealSamsungHealthBridge(context)
         } catch (_: ClassNotFoundException) {
             NoOpSamsungHealthBridge()

@@ -6,16 +6,11 @@ import com.eldercareguardian.data.PostureStatus
 import com.eldercareguardian.data.RiskStatus
 import com.eldercareguardian.data.SensorFrame
 import com.eldercareguardian.data.SmartSuitDataSource
-import com.eldercareguardian.ml.BloodPressureEstimator
 import com.eldercareguardian.ml.CaregiverAlertPolicy
-import com.eldercareguardian.ml.DehydrationRiskModel
-import com.eldercareguardian.ml.EcgAnomalyDetector
 import com.eldercareguardian.ml.FallConfirmationBuffer
 import com.eldercareguardian.ml.FallDetectionEngine
-import com.eldercareguardian.ml.HeartRateExtractor
+import com.eldercareguardian.ml.HealthRiskPipeline
 import com.eldercareguardian.ml.InactivityMonitor
-import com.eldercareguardian.ml.OverexertionModel
-import com.eldercareguardian.ml.VitalsRiskMonitor
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -69,14 +64,17 @@ class SmartSuitSimulator : SmartSuitDataSource {
             val confirmedFallRisk = fallBuffer.assess(fall, sosActive)
             inactivitySeconds = InactivityMonitor.assess(imuMagnitude, inactivitySeconds)
 
-            val bp = BloodPressureEstimator.estimate(heartRateBpm, skinTempC)
-            val vitalsRisk = VitalsRiskMonitor.assess(heartRateBpm, spo2Percent, respiratoryRate, skinTempC)
-            val dehydration = DehydrationRiskModel.assess(sweatRatePercentPerMin, skinTempC, heartRateBpm)
-            val overexertion = OverexertionModel.assess(heartRateBpm, spo2Percent, respiratoryRate, imuMagnitude)
-            val heartRateFromEcg = HeartRateExtractor.extractRrIntervals(buildEcgWindow(tick, heartRateBpm))
-
-            val ecgSamples = buildEcgWindow(tick, heartRateFromEcg.meanHrBpm ?: heartRateBpm)
-            val ecg = EcgAnomalyDetector.assess(ecgSamples, heartRateBpm)
+            val ecgSamples = buildEcgWindow(tick, heartRateBpm)
+            val assessment = HealthRiskPipeline.assess(
+                ecgSamples = ecgSamples,
+                heartRateBpm = heartRateBpm,
+                spo2Percent = spo2Percent,
+                respiratoryRate = respiratoryRate,
+                skinTempC = skinTempC,
+                sweatRatePercentPerMin = sweatRatePercentPerMin,
+                imuMagnitude = imuMagnitude,
+                patientAgeYears = 70,
+            )
 
             val posture = when (fall.riskStatus) {
                 RiskStatus.High -> PostureStatus.Bad
@@ -88,27 +86,27 @@ class SmartSuitSimulator : SmartSuitDataSource {
                 timestampMillis = System.currentTimeMillis(),
                 heartRateBpm = heartRateBpm,
                 spo2Percent = spo2Percent,
-                systolicMmHg = bp.systolicMmHg,
-                diastolicMmHg = bp.diastolicMmHg,
+                systolicMmHg = assessment.bloodPressure.systolicMmHg,
+                diastolicMmHg = assessment.bloodPressure.diastolicMmHg,
                 skinTempC = skinTempC,
                 humidityPercent = humidityPercent,
                 respiratoryRate = respiratoryRate,
                 posture = posture,
-                fatigue = overexertion.status,
-                dehydration = dehydration.risk,
+                fatigue = assessment.overexertion.status,
+                dehydration = assessment.dehydration.risk,
                 fallRisk = confirmedFallRisk,
                 caregiverAlert = CaregiverAlertStatus.Normal,
                 sosActive = sosActive,
                 inactivityMinutes = InactivityMonitor.toMinutes(inactivitySeconds),
                 supercapPercent = (72 + (sin(tick / 8.0) * 8).toInt()).coerceIn(0, 100),
                 ecgSamples = ecgSamples,
-                ecgAnomaly = ecg.status,
-                vitalsRisk = vitalsRisk.risk,
-                rrIntervalsMs = heartRateFromEcg.rrIntervalsMs,
+                ecgAnomaly = assessment.ecg.status,
+                vitalsRisk = assessment.vitals.risk,
+                rrIntervalsMs = assessment.ecg.rrIntervalsMs,
                 imuMagnitude = imuMagnitude,
                 sweatRatePercentPerMin = sweatRatePercentPerMin,
-                hrReservePercent = overexertion.hrReservePercent,
-                bpEstimated = bp.isEstimated,
+                hrReservePercent = assessment.overexertion.hrReservePercent,
+                bpEstimated = assessment.bloodPressure.isEstimated,
                 batteryPercent = (90 - tick % 95).coerceIn(0, 100),
             )
             val caregiverAlerted = frame.copy(caregiverAlert = CaregiverAlertPolicy.evaluate(frame))

@@ -25,8 +25,8 @@ import kotlin.math.sqrt
  *  - If stillness follows a spike within SPIKE_TO_STILLNESS_WINDOW_SAMPLES, confirm fall.
  *
  * False-negative reduction:
- *  - Lowered spike threshold to 19.6 m/s² (2g) — typical real-world fall impact.
- *  - Stillness threshold raised to 4.0 m/s² (patient may be breathing, trembling).
+ *  - Spike threshold calibrated to 7.5 m/s² (0.76g) from SisFall elderly subset.
+ *  - Stillness threshold calibrated to 15.0 m/s² — allows natural arm settling.
  *  - Medium risk fires on spike alone, allowing the confirmation buffer to escalate.
  *
  * Calibration: Thresholds validated against the SisFall elderly subset (June 2026).

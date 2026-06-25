@@ -52,6 +52,8 @@ class ElderCareMonitorService : Service() {
         const val NOTIFICATION_ID_ALERT = 1002
 
         const val ACTION_STOP = "com.eldercareguardian.STOP_MONITORING"
+        const val ACTION_UPDATE_ALERT = "com.eldercareguardian.UPDATE_ALERT"
+        const val EXTRA_ALERT_STATUS = "alert_status"
 
         fun startIntent(context: Context): Intent =
             Intent(context, ElderCareMonitorService::class.java)
@@ -60,6 +62,14 @@ class ElderCareMonitorService : Service() {
             Intent(context, ElderCareMonitorService::class.java).apply {
                 action = ACTION_STOP
             }
+
+        fun updateAlertStatus(context: Context, status: CaregiverAlertStatus) {
+            val intent = Intent(context, ElderCareMonitorService::class.java).apply {
+                action = ACTION_UPDATE_ALERT
+                putExtra(EXTRA_ALERT_STATUS, status.name)
+            }
+            context.startForegroundService(intent)
+        }
     }
 
     inner class LocalBinder : Binder() {
@@ -76,10 +86,22 @@ class ElderCareMonitorService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_STOP -> {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_UPDATE_ALERT -> {
+                val statusName = intent.getStringExtra(EXTRA_ALERT_STATUS)
+                if (statusName != null) {
+                    try {
+                        val status = CaregiverAlertStatus.valueOf(statusName)
+                        updateAlertStatus(status)
+                    } catch (_: IllegalArgumentException) { }
+                }
+                return START_STICKY
+            }
         }
 
         val notification = buildMonitoringNotification(CaregiverAlertStatus.Normal)

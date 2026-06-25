@@ -1,7 +1,11 @@
 package com.eldercareguardian.ui.screens
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,7 +54,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.eldercareguardian.data.Patient
 import com.eldercareguardian.settings.DataRetentionPreferences
 import com.eldercareguardian.settings.isValidPhone
@@ -98,6 +104,15 @@ fun SettingsScreen(
     var errorText by remember { mutableStateOf<String?>(null) }
     var saved by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val smsPermissionContext = LocalContext.current
+
+    // B31: Request SEND_SMS permission on-demand when the SMS toggle is enabled.
+    val smsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        // Enable SMS only if the user actually granted the permission.
+        onSmsEnabledChanged(granted)
+    }
 
     LaunchedEffect(saved) {
         if (saved) {
@@ -216,7 +231,21 @@ fun SettingsScreen(
                         }
                         Switch(
                             checked = smsEnabled,
-                            onCheckedChange = onSmsEnabledChanged,
+                            onCheckedChange = { enabled ->
+                                if (enabled) {
+                                    // B31: Only request SEND_SMS when user turns on SMS alerts.
+                                    val hasSmsPerm = ContextCompat.checkSelfPermission(
+                                        smsPermissionContext, Manifest.permission.SEND_SMS
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                    if (hasSmsPerm) {
+                                        onSmsEnabledChanged(true)
+                                    } else {
+                                        smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
+                                    }
+                                } else {
+                                    onSmsEnabledChanged(false)
+                                }
+                            },
                         )
                     }
 

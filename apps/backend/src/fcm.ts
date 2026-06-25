@@ -8,7 +8,9 @@ function getApp(): admin.app.App {
   const serviceAccountRaw = process.env.FCM_SERVICE_ACCOUNT_JSON;
   if (!serviceAccountRaw) {
     console.warn('FCM_SERVICE_ACCOUNT_JSON not set — FCM calls will fail');
-    return admin.initializeApp({ projectId: 'eldercare-guardian' });
+    admin.initializeApp({ projectId: 'eldercare-guardian' });
+    initialized = true;
+    return admin.app();
   }
 
   try {
@@ -27,11 +29,22 @@ export async function sendToToken(
   token: string,
   title: string,
   body: string,
+  level?: string,
+  reason?: string,
+  patientName?: string,
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     const message: admin.messaging.Message = {
       token,
       notification: { title, body },
+      // Data payload reaches onMessageReceived() when app is foregrounded.
+      // When backgrounded, notification auto-displays AND data is available
+      // via the launch intent extras.
+      data: {
+        alertLevel: level || 'Unknown',
+        reason: reason || '',
+        patientName: patientName || '',
+      },
       android: { priority: 'high' },
     };
     const messageId = await getApp().messaging().send(message);
