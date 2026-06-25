@@ -53,27 +53,28 @@ object EcgAnomalyDetector {
         val status: EcgAnomalyStatus,
         val rmssdMs: Int?,
         val meanHrBpm: Int?,
+        val rrIntervalsMs: List<Int> = emptyList(),
     )
 
     fun assess(ecgSamples: List<Float>, reportedHrBpm: Int? = null): EcgAssessment {
         val rr = HeartRateExtractor.extractRrIntervals(ecgSamples)
         val meanHr = rr.meanHrBpm ?: reportedHrBpm
-        if (meanHr == null) return EcgAssessment(EcgAnomalyStatus.Unknown, null, null)
+        if (meanHr == null) return EcgAssessment(EcgAnomalyStatus.Unknown, null, null, rr.rrIntervalsMs)
 
         // Rate-based classification takes priority — these don't need many RR intervals.
         if (meanHr >= TACHY_THRESHOLD_BPM) {
-            return EcgAssessment(EcgAnomalyStatus.Tachycardia, null, meanHr)
+            return EcgAssessment(EcgAnomalyStatus.Tachycardia, null, meanHr, rr.rrIntervalsMs)
         }
         if (meanHr <= BRADY_THRESHOLD_BPM) {
-            return EcgAssessment(EcgAnomalyStatus.Bradycardia, null, meanHr)
+            return EcgAssessment(EcgAnomalyStatus.Bradycardia, null, meanHr, rr.rrIntervalsMs)
         }
 
         // AFib classification requires enough RR intervals for statistical reliability.
         if (rr.rrIntervalsMs.size < MIN_RR_INTERVALS) {
-            return EcgAssessment(EcgAnomalyStatus.Normal, null, meanHr)
+            return EcgAssessment(EcgAnomalyStatus.Normal, null, meanHr, rr.rrIntervalsMs)
         }
 
-        val rmssd = HeartRateExtractor.rmssd(rr.rrIntervalsMs) ?: return EcgAssessment(EcgAnomalyStatus.Normal, null, meanHr)
+        val rmssd = HeartRateExtractor.rmssd(rr.rrIntervalsMs) ?: return EcgAssessment(EcgAnomalyStatus.Normal, null, meanHr, rr.rrIntervalsMs)
         val irregularity = rrIrregularity(rr.rrIntervalsMs)
 
         // AFib: HIGH RMSSD (chaotic intervals) AND HIGH irregularity.
@@ -84,7 +85,7 @@ object EcgAnomalyDetector {
             EcgAnomalyStatus.Normal
         }
 
-        return EcgAssessment(status, rmssd, meanHr)
+        return EcgAssessment(status, rmssd, meanHr, rr.rrIntervalsMs)
     }
 
     /**

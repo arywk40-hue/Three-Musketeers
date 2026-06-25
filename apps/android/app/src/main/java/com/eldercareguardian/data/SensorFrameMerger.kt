@@ -74,6 +74,13 @@ object SensorFrameMerger {
             else -> Spo2Quality.Reliable
         }
 
+        val overexertionStatus = assessment?.overexertion?.status ?: base.fatigue
+        val dehydrationRisk = assessment?.dehydration?.risk ?: base.dehydration
+        val vitalsRisk = assessment?.vitals?.risk ?: base.vitalsRisk
+        val ecgStatus = assessment?.ecg?.status ?: base.ecgAnomaly
+        val rrIntervals = assessment?.ecg?.rrIntervalsMs ?: base.rrIntervalsMs
+        val hrReserve = assessment?.overexertion?.hrReservePercent ?: base.hrReservePercent
+
         val merged = base.copy(
             heartRateBpm = heartRateBpm,
             spo2Percent = spo2Percent,
@@ -84,13 +91,13 @@ object SensorFrameMerger {
             inactivityMinutes = InactivityMonitor.toMinutes(inactivitySeconds),
             fallRisk = confirmedFallRisk ?: base.fallRisk,
             posture = posture,
-            fatigue = assessment?.overexertion.status ?: base.fatigue,
-            dehydration = assessment?.dehydration.risk ?: base.dehydration,
-            vitalsRisk = assessment?.vitals.risk ?: base.vitalsRisk,
-            ecgAnomaly = assessment?.ecg.status ?: base.ecgAnomaly,
-            rrIntervalsMs = assessment?.ecg.rrIntervalsMs ?: base.rrIntervalsMs,
+            fatigue = overexertionStatus,
+            dehydration = dehydrationRisk,
+            vitalsRisk = vitalsRisk,
+            ecgAnomaly = ecgStatus,
+            rrIntervalsMs = rrIntervals,
             imuMagnitude = imuMagnitude,
-            hrReservePercent = assessment?.overexertion.hrReservePercent ?: base.hrReservePercent,
+            hrReservePercent = hrReserve,
             batteryPercent = ble.batteryPercent ?: base.batteryPercent,
             spo2Quality = spo2Quality,
         )
