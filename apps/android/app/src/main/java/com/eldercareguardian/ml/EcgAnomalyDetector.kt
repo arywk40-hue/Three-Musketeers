@@ -33,18 +33,20 @@ object EcgAnomalyDetector {
     private const val BRADY_THRESHOLD_BPM = 50
 
     /**
-     * AFib RMSSD threshold (ms). AFib is associated with HIGH RMSSD (> 50 ms)
+     * AFib RMSSD threshold (ms). AFib is associated with elevated RMSSD (> 40 ms)
      * combined with high irregularity. Low RMSSD indicates regular rhythm.
      *
+     * Tuned against MIT-BIH Arrhythmia DB + AF Database with 720-sample windows
+     * (equivalent to Kotlin's 600-sample ECG buffer). Val RMSSD split ~ 35 ms.
      * Reference: Lian et al. (2011), "A simple method to detect AFib using RR intervals."
      */
-    private const val AFIB_RMSSD_THRESHOLD_MS = 50
+    private const val AFIB_RMSSD_THRESHOLD_MS = 40
 
     /**
-     * AFib irregularity threshold. RR irregularity (MAD / mean) > 0.20 is consistent
-     * with AFib. Values < 0.10 indicate highly regular sinus rhythm.
+     * AFib irregularity threshold. RR irregularity (MAD / mean) > 0.12 is consistent
+     * with AFib. Normal sinus MAD/mean < 0.08.
      */
-    private const val AFIB_IRREGULARITY_THRESHOLD = 0.20f
+    private const val AFIB_IRREGULARITY_THRESHOLD = 0.12f
 
     /** Minimum valid RR intervals required for any AFib classification. */
     private const val MIN_RR_INTERVALS = 4

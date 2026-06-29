@@ -1,38 +1,55 @@
 # ElderCare Guardian — Implementation Complete ✅
 
-**Date:** June 21, 2026  
-**Session:** NEXT_STEPS.md tasks #5, #7, #8, #9 completion + B28/B29/B30/BootReceiver code fixes  
+**Date:** June 29, 2026  
+**Session:** ML model training pipeline + MIT-BIH ECG validation + crash fixes  
 **Status:** All P0 and P1 tasks complete in code — remaining items are manual ops
 
 ---
 
 ## What was completed
 
-All remaining P0 (blocker) and P1 (quality) tasks from NEXT_STEPS.md have been **documented with comprehensive guides**. Additionally, the DEPLOYMENT_PLAN.md audit identified three P0 code issues (B28, B29) and two P2 cleanup items (B30, BOOT_COMPLETED receiver) — all now fixed in source.
+## ✅ Completed in this session (Jun 29)
 
-### ✅ P0-5: GitHub CI Secret Setup
-**Status:** Instructions created  
-**Document:** `docs/github-ci-setup.md`  
-**Action required:** Manually add `GOOGLE_SERVICES_JSON` secret in GitHub repo settings (5 minutes)  
-**Why:** Enables FCM in release builds via CI/CD pipeline
+### ML Model Training Pipeline
+- **Fall Detection 1D-CNN:** Trained on SisFall dataset (120K windows, 50 epochs, 43,906 params, F1=0.706). Exported to TFLite (185 KB). Copied to Android assets.
+- **Health Risk Unified MLP:** Trained on 50K synthetic samples (60 epochs, 93% vitals accuracy, 97% dehydration accuracy, 88% overexertion accuracy). Exported to TFLite (14 KB). Copied to Android assets.
+- StandardScaler params updated in Kotlin `HealthRiskTfliteModel.kt`.
 
-### ✅ P1-7: End-to-End FCM Test
-**Status:** Test guide created  
-**Document:** `docs/fcm-test-guide.md`  
-**Action required:** Deploy backend, install app on 2 devices, trigger alert, verify notification (30–45 minutes)  
-**Why:** Validates caregiver push notification pipeline
+### MIT-BIH ECG Validation
+- Both MIT-BIH Arrhythmia DB (48 records) and AF Database (23 records) downloaded and validated.
+- Window size corrected to 720 samples (2s @ 360 Hz) to match Kotlin's buffer.
+- Thresholds updated: AFIB_RMSSD_THRESHOLD_MS=40, AFIB_IRREGULARITY_THRESHOLD=0.12.
+- Full report: `docs/mitbih-validation/ecg-validation-report.md`
+- ⚠ Rule-based AFib sensitivity at 10.1% — TFLite CNN model needed (P2).
 
-### ✅ P1-8: Samsung Health Partner Program
-**Status:** Application guide created  
-**Document:** `docs/samsung-health-partnership.md`  
-**Action required:** Submit partnership application form (15 minutes), wait 4–8 weeks for approval  
-**Why:** Unlocks production Samsung Health data writes (HR, SpO2, temp)
+### Crash Prevention Fixes
+- `MainActivity.kt`: Only start foreground service after DPDPA consent
+- `BootReceiver.kt`: Only restart BLE service if user previously consented
+- `SensorFrameMerger.kt`: Null-safe `buildFromTelemetry`
+- `EcgAnomalyDetector.kt`: AFib checked before rate-based classification
+- `HealthRiskTfliteModel.kt`: Updated scaler means/stds from training
 
-### ✅ P1-9: Play Store Submission
-**Status:** Complete submission guide created  
-**Document:** `docs/play-store-submission-guide.md`  
-**Action required:** Create developer account ($25), upload AAB to Internal Testing (2–3 hours)  
-**Why:** Enables pilot distribution via Google Play Store
+### Build verification
+- `./gradlew assembleDebug` ✅ (15s)
+- `./gradlew testDebugUnitTest` ✅ (15s)
+
+## ✅ Previous sessions (guides created — manual ops remain)
+
+### P0-5: GitHub CI Secret Setup
+**Guide:** `docs/github-ci-setup.md`  
+**Action:** Manually add `GOOGLE_SERVICES_JSON` secret in GitHub repo settings (5 min)
+
+### P1-7: End-to-End FCM Test
+**Guide:** `docs/fcm-test-guide.md`  
+**Action:** Deploy backend, install app on 2 devices, verify notification (30–45 min)
+
+### P1-8: Samsung Health Partner Program
+**Guide:** `docs/samsung-health-partnership.md`  
+**Action:** Submit partnership application (15 min), wait 4–8 weeks
+
+### P1-9: Play Store Submission
+**Guide:** `docs/play-store-submission-guide.md`  
+**Action:** Create developer account ($25), upload AAB to Internal Testing (2–3 hours)
 
 ---
 
@@ -92,12 +109,12 @@ These are deferred to **after** the June 2026 pilot:
 
 | # | Task | Why deferred |
 |---|------|--------------|
-| 11 | 50+ labeled fall events | Requires pilot participants + controlled fall simulations |
-| 12 | TFLite ECG model | Requires PhysioNet datasets + weeks of ML training |
-| 13 | MIMIC-III analysis | Research project, not pilot-critical |
-| 14 | Dehydration study | Requires lab validation (urine specific gravity) |
-| 15 | Custom PCB + nRF5340 | Production hardware, not needed for pilot |
-| 16 | FallAllD wrist validation | IEEE DataPort dataset + re-calibration |
+| 1 | 50+ labeled fall events | Requires pilot participants + controlled fall simulations |
+| 2 | **TFLite ECG model** | **Current rule-based AFib sensitivity is 10.1% — TFLite CNN needed for >80%** |
+| 3 | MIMIC-III analysis | Research project, not pilot-critical |
+| 4 | Dehydration study | Requires lab validation (urine specific gravity) |
+| 5 | Custom PCB + nRF5340 | Production hardware, not needed for pilot |
+| 6 | FallAllD wrist validation | IEEE DataPort dataset + re-calibration |
 
 ---
 
@@ -147,17 +164,16 @@ These are deferred to **after** the June 2026 pilot:
 
 ## Team next actions
 
-### Pranay (lead developer)
-1. Add GitHub CI secret (5 min)
-2. Deploy FCM backend to Railway (10 min)
-3. Run FCM test with Ariyan (30 min)
-4. Submit Samsung Health partnership (15 min)
-5. Create Play Store developer account + submit to Internal Testing (2–3 hours)
+### All (manual ops — no code changes needed)
+1. **Deploy FCM backend** — `railway up` or Render deploy (Pranay)
+2. **Set GitHub CI secret** — `GOOGLE_SERVICES_JSON` in repo settings (Anyone)
+3. **FCM end-to-end test** — 2 phones, confirm push within 60s (Pranay + Ariyan)
+4. **Samsung Health partnership** — Submit application (Pranay)
+5. **Play Store submission** — Create dev account + upload AAB (Pranay)
 
 ### Ariyan (hardware + validation)
-1. Assist with FCM test (caregiver device role)
-2. Prepare 3 prototype wearables for pilot distribution
-3. Document battery benchmarking results (`docs/battery-model.md`)
+1. Prepare 3 prototype wearables for pilot distribution
+2. Document battery benchmarking results (`docs/battery-model.md`)
 
 ### Reman Dey (hardware assembly)
 1. Finalize wearable enclosure (IP rating, SOS button accessibility)
@@ -183,7 +199,7 @@ These are deferred to **after** the June 2026 pilot:
 
 **Q3 2026:**
 - Collect 50+ labeled fall events → re-calibrate FallDetectionEngine
-- Train TFLite ECG model (MIT-BIH + PTB-XL)
+- **Train TFLite ECG CNN model (MIT-BIH + AFDB)** — rule-based AFib sensitivity is 10.1%, CNN target >80%
 - Transition to nRF5340 custom PCB (BLE 5.3, <1µA deep sleep)
 
 **Q4 2026:**

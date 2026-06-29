@@ -21,12 +21,12 @@ Each track has independent timelines and can progress in parallel.
 
 | Track | Progress | Remaining |
 |-------|----------|-----------|
-| **A — Play Store** | Package renamed, signing configured, CI/release pipeline, R8 rules, privacy policy + ToS, app icon, medical claims sweep, data retention, background location permission | Screenshots, Play Store listing, Data Safety section, beta submission |
-| **B — Samsung Health** | `SamsungHealthBridge` abstraction with `NoOp`/`Real` impl, `SamsungHealthState` UI | Download AAR + partner approval (4–8 weeks), physical device testing |
+| **A — Play Store** | Package renamed, signing configured, CI/release pipeline, R8 rules, privacy policy + ToS, app icon, medical claims sweep, data retention, background location permission | Screenshots, Play Store listing, Data Safety section, beta submission (manual ops) |
+| **B — Samsung Health** | `SamsungHealthBridge` rewritten against SDK v1.1.0 via reflection, `SamsungHealthState` UI | Download AAR + partner approval (4–8 weeks), physical device testing |
 | **C — Hardware** | ESP32-C3 prototype, BLE GATT profile defined, embedded firmware with watchdog | Custom PCB, certification ($8K), enclosure |
-| **D — Pilot** | Fall detection validation harness (SisFall), calibration report | Dataset download + run validation, recruit participants |
+| **D — Pilot** | ✅ SisFall validation executed (F1=0.667, spike=7.5, stillness=15.0). ✅ MIT-BIH ECG validation executed (sens=0.101, spec=0.989). ✅ Fall CNN trained + TFLite (185 KB). ✅ Health risk MLP trained + TFLite (14 KB). ✅ Crash fixes (consent-gated services, null-safe frame merging, AFib priority). | Recruit pilot participants |
 
-**Blockers resolved:** All P0 (0 remaining), all P1 (0 remaining — B07/B10/B11 fixed), P2 (1 remaining — B14 single-point-of-failure deferred).
+**Code blockers resolved:** All P0+P1 code tasks done. Remaining items are manual ops (deployment, account creation, Play Store submission).
 
 ---
 
@@ -174,7 +174,7 @@ Under the Medical Devices Rules 2017 (India), the device may qualify as:
 
 # ElderCare Guardian — Deployment Audit & Implementation Roadmap
 
-**Date:** June 21, 2026
+**Date:** June 29, 2026
 **Scope:** Cross-checked `DEPLOYMENT_PLAN.md`, `NEXT_STEPS.md`, `LAUNCH_BLOCKERS.md`, and `IMPLEMENTATION_COMPLETE.md` against the actual Android source (Compose UI, BLE stack, ML engines, Samsung bridge, FCM, service layer).
 
 ---

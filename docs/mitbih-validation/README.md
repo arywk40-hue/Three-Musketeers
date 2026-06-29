@@ -43,8 +43,12 @@ Report written to `docs/mitbih-validation/ecg-validation-report.md` with:
 ## Algorithm
 
 The script reimplements `HeartRateExtractor` + `EcgAnomalyDetector` in pure Python
-(no Android dependency). A 256-sample sliding window (50% overlap) is classified as
-AFib if `RMSSD > 50 ms AND RR irregularity > 0.20`.
+(no Android dependency). A 720-sample sliding window (50% overlap) is classified as
+AFib if `RMSSD > 40 ms AND RR irregularity > 0.12`.
 
-MIT-BIH records at 360 Hz: window ≈ 0.71 s. The AF Database is evaluated with the
-same window size.
+MIT-BIH records at 360 Hz: window = 2.0 s (matches Kotlin's 600-sample buffer at 256 Hz).
+The AF Database is evaluated with the same window size.
+
+**Current sensitivity: 0.101** — rule-based RMSSD approach needs more RR intervals than
+a 2s window provides at normal HR. A TFLite CNN model is planned for P2 to reach the
+pilot safety target of ≥ 0.80 sensitivity.

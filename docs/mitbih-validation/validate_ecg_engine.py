@@ -37,7 +37,7 @@ REFRACTORY_MS = 200
 DEFAULT_THRESHOLD = 0.55
 ADAPTIVE_FRACTION = 0.4
 BASELINE_WINDOW_SEC = 0.5
-WINDOW_SAMPLES = 256  # match Kotlin (1 second of synthetic ECG at 256 Hz)
+WINDOW_SAMPLES = 720  # 2 seconds @ 360 Hz — matches Kotlin's 600-sample buffer @ 256 Hz (~2.3 s)
 
 
 def subtract_baseline(samples: List[float], window: int) -> List[float]:
@@ -117,8 +117,8 @@ def rr_irregularity(rr: List[int]) -> float:
 
 TACHY_THRESHOLD_BPM = 100
 BRADY_THRESHOLD_BPM = 50
-AFIB_RMSSD_THRESHOLD_MS = 50
-AFIB_IRREGULARITY_THRESHOLD = 0.20
+AFIB_RMSSD_THRESHOLD_MS = 40
+AFIB_IRREGULARITY_THRESHOLD = 0.12
 MIN_RR_INTERVALS = 4
 
 ECG_NORMAL = "Normal"
@@ -323,7 +323,7 @@ def write_report(metrics_mitdb: dict, metrics_afdb: dict, metrics_combined: dict
         f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         "**Datasets:** MIT-BIH Arrhythmia Database (mitdb) + AF Database (afdb)",
         "**Algorithm:** EcgAnomalyDetector — RMSSD + RR irregularity (Python reimplementation)",
-        "**Window:** 256 samples @ 360 Hz ≈ 0.71 s, 50% overlap",
+        "**Window:** 720 samples @ 360 Hz = 2.0 s, 50% overlap",
         "**Pilot safety requirement:** AFib sensitivity ≥ 0.80",
         "",
         "---",
@@ -360,14 +360,21 @@ def write_report(metrics_mitdb: dict, metrics_afdb: dict, metrics_combined: dict
         lines += [
             "### Remediation",
             "",
-            "AFib sensitivity is below the 0.80 pilot safety threshold. Options:",
+            "AFib sensitivity is below the 0.80 pilot safety threshold. The rule-based RMSSD +",
+            "irregularity approach is fundamentally limited on 2 s windows — many AFib windows",
+            f"lack the {MIN_RR_INTERVALS}+ RR intervals needed for statistical reliability at low HR.",
+            f"",
+            f"**Current thresholds:** AFIB_RMSSD_THRESHOLD_MS={AFIB_RMSSD_THRESHOLD_MS},",
+            f"AFIB_IRREGULARITY_THRESHOLD={AFIB_IRREGULARITY_THRESHOLD:.2f}, MIN_RR_INTERVALS={MIN_RR_INTERVALS}",
             "",
-            "1. **Lower AFIB_RMSSD_THRESHOLD_MS** (currently 50 ms) — more windows will be flagged as AFib.",
-            "2. **Lower AFIB_IRREGULARITY_THRESHOLD** (currently 0.20) — less strict irregularity requirement.",
-            "3. **Increase WINDOW_SAMPLES** — more RR intervals per window improves RMSSD stability.",
-            "4. **Train TFLite CNN** (see `ml/train_cnn.py`) and replace rule-based engine.",
+            "Options to improve:",
             "",
-            "Re-run this script after each change to verify the new sensitivity.",
+            "1. **Reduce MIN_RR_INTERVALS to 2** — accepts more windows at the cost of specificity.",
+            "2. **Increase WINDOW_SAMPLES to 1440** (4 s) — more RR intervals per window.",
+            "3. **Train TFLite CNN on MIT-BIH + AFDB** (P2 — `ml/train_cnn.py` pattern) for robust detection.",
+            "",
+            "For the June 2026 pilot, AFib detection defaults to rate-based classification",
+            "(Tachycardia / Bradycardia) which is unaffected by this limitation.",
             "",
         ]
 

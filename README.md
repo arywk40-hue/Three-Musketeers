@@ -130,19 +130,20 @@ app/src/main/java/com/eldercareguardian/
 └── ui/               # Jetpack Compose screens + components
 ```
 
-### ML Models *(rule-based; TFLite scaffold prepared in Session 10)*
+### ML Models *(rule-based + TFLite models deployed)*
 
 | Model | Status | Algorithm |
 |-------|--------|-----------|
-| Fall detection | ✅ FallDetectionEngine + FallConfirmationBuffer | Temporal window |
+| Fall detection (CNN) | ✅ `fall_detection.tflite` (185 KB) | 1D-CNN Conv1D(32→64→128) → Dense |
+| Fall detection (rule) | ✅ FallDetectionEngine + FallConfirmationBuffer | Temporal window, SisFall-calibrated |
+| Health risk (unified MLP) | ✅ `health_risk.tflite` (14 KB) | Shared trunk + 3 output heads |
 | Caregiver alert triage | ✅ CaregiverAlertPolicy | 4-level triage |
 | Inactivity monitoring | ✅ InactivityMonitor | Motion gate |
 | ECG anomaly | ✅ EcgAnomalyDetector + HeartRateExtractor | RMSSD + RR intervals |
 | Dehydration risk | ✅ DehydrationRiskModel | Tabular rules |
-| Vitals risk | ✅ VitalsRiskMonitor | Composite score |
+| Vitals risk | ✅ VitalsRiskMonitor | Composite score (NEWS2) |
 | Overexertion | ✅ OverexertionModel | HR reserve + SpO2 |
-| BP estimation | ✅ Active — displayed with "est mmHg" label | Linear HR+temp model; removed from Samsung Health writes only |
-| TFLite models | ⏳ Scaffold exists (`TfLiteFallbackLoader`), no `.tflite` files yet | See `THINGS_LEFT.md` |
+| BP estimation | ✅ Active — displayed with "est mmHg" label | Linear HR+temp model |
 
 ### Samsung Health Integration *(reflection bridge active, AAR optional)*
 
@@ -203,6 +204,10 @@ Custom ElderCare Service (12345678-1234-5678-1234-567812345678)
 | 14 | Samsung Health reflection bridge | ✅ Done |
 | 15 | SpO2 quality + 3-reading debounce + 4-level alert | ✅ Done |
 | 16 | Security hardening (SQLCipher, EncryptedSharedPrefs, permissions tier split) | ✅ Done |
+| 17 | SisFall validation + CNN training + TFLite export | ✅ Done |
+| 18 | Health risk MLP training + TFLite export | ✅ Done |
+| 19 | MIT-BIH ECG validation + AFib threshold tuning | ✅ Done |
+| 20 | Crash fixes: consent-guarded service, null-safe merger, AFib priority | ✅ Done |
 
 ---
 

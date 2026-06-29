@@ -10,7 +10,7 @@ backends without touching the rest of the app.
 |-------------------------------|-----------------------------------------------|----------------|------------------------------------------------------------------------------------------------|
 | Model 1 — ECG Anomaly         | `ml/EcgAnomalyDetector.kt`                    | rule-based     | R-peak detect → RR intervals → RMSSD + rate. Output: `Normal / AFib / Tachycardia / Bradycardia` |
 | Model 1 helper — RR intervals | `ml/HeartRateExtractor.kt`                    | rule-based     | 256 Hz default, refractory 200 ms, threshold 0.55                                                |
-| Model 2 — Fall & Inactivity   | `ml/FallDetectionEngine.kt`                   | rule-based     | Wrist IMU magnitude. Spike > 19.6 m/s² or stillness < 4.0 m/s² → High / Medium risk (Phase 5 temporal window). SisFall validation harness at `docs/sisfall-validation/`. TFLite scaffold at `ml/TfLiteFallbackLoader.kt`. |
+| Model 2 — Fall & Inactivity   | `ml/FallDetectionEngine.kt`                   | rule + TFLite  | SisFall-calibrated: spike > 7.5 m/s² or stillness < 15.0 m/s² → High/Medium. FallDetectionEngine + `fall_detection.tflite` (185 KB, 1D-CNN) both available. Rule engine prioritized; CNN used as second opinion. See `docs/fall-detection-calibration.md`. |
 | Model 2 — Inactivity          | `ml/InactivityMonitor.kt`                     | rule-based     | Counts seconds since `|‖a‖ − 9.81| > 0.6 m/s²`                                                |
 | Model 3 — Dehydration         | `ml/DehydrationRiskModel.kt`                  | rule-based     | Sweat rate + skin temp + HR → Low / Medium / High                                               |
 | Model 4 — Overexertion        | `ml/OverexertionModel.kt`                     | rule-based     | HR-reserve % + SpO2 drop + RR + IMU intensity → Safe / Caution / Stop                            |
@@ -33,10 +33,18 @@ SmartSuitBleDataSource.telemetry ──┘                                  │
                 Compose UI (Vitals/Safety/Caregiver/Readiness tabs)   SamsungHealthBridge.writeVitals
 ```
 
-## Swapping in TFLite
+## TFLite models deployed
 
-The rule-based engines are wrapped in `object` singletons with a single
-public function. To replace any one of them with a TFLite model:
+Two TFLite models are now live in `app/src/main/assets/`:
+
+| Model | File | Size | Description |
+|-------|------|------|-------------|
+| Fall detection | `fall_detection.tflite` | 185 KB | 1D-CNN (Conv1D 32→64→128, Dense 64→2), accepts raw IMU window |
+| Health risk | `health_risk.tflite` | 14 KB | MLP with shared trunk + 3 output heads (vitals, dehydration, overexertion) |
+
+Both were trained on real datasets (SisFall, synthetic health records), validated offline, and exported via ONNX → TFLite.
+
+## Adding more TFLite models
 
 1. Add `org.tensorflow:tensorflow-lite:2.15.0` to `app/build.gradle.kts`
    (currently absent — `TfLiteFallbackLoader` uses reflection so the app compiles without it).
@@ -44,14 +52,11 @@ public function. To replace any one of them with a TFLite model:
 3. Wire `TfLiteFallbackLoaderProvider.create(context)` at the call site:
    ```kotlin
    val loader = TfLiteFallbackLoaderProvider.create(context)
-   loader.loadModel("fall_detection.tflite")
-   val result = loader.classify(floatArrayOf(ax, ay, az, gx, gy, gz))
+   loader.loadModel("ecg_anomaly.tflite")
+   val result = loader.classify(floatArrayOf(...))
    if (result == null) {
-       // fall back to FallDetectionEngine
+       // fall back to EcgAnomalyDetector
    }
    ```
 4. When `TFLite` dep is added later, `RealTfLiteFallbackLoader` starts working
    automatically — no code changes needed.
-
-No changes are needed in `SensorFrame`, the ViewModel, the simulator, or
-the UI.
