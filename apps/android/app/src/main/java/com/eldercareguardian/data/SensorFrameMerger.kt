@@ -24,11 +24,14 @@ object SensorFrameMerger {
         val hasBle = ble.heartRateBpm != null
         if (!hasBle) return base
 
-        val heartRateBpm = ble.heartRateBpm ?: base.heartRateBpm
-        val spo2Percent = ble.spo2Percent ?: base.spo2Percent
-        val humidityPercent = ble.humidityPercent ?: base.humidityPercent
-        val respiratoryRate = ble.respiratoryRate?.toInt() ?: base.respiratoryRate
-        val ecgSamples = ble.ecgSamples.takeIf { it.size == 256 } ?: base.ecgSamples
+        return buildFromTelemetry(ble, tfliteModel, patientAgeYears)!!
+    }
+
+    fun buildFromTelemetry(ble: SmartSuitBleTelemetry, tfliteModel: FallDetectionTfliteModel? = null, patientAgeYears: Int = 70): SensorFrame? {
+        val heartRateBpm = ble.heartRateBpm ?: return null
+        val spo2Percent = ble.spo2Percent ?: 0f
+        val respiratoryRate = ble.respiratoryRate?.toInt() ?: 0
+        val ecgSamples = ble.ecgSamples.takeIf { it.size == 256 } ?: emptyList()
 
         val fall = if (ble.wristImu.size >= 6) {
             tfliteModel?.assess(ble.wristImu)?.takeIf { it.riskScore >= 0.5f }
@@ -41,7 +44,7 @@ object SensorFrameMerger {
             val a = ble.wristImu
             sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2])
         } else {
-            base.imuMagnitude
+            0f
         }
         val isFallActive = fall?.riskStatus == RiskStatus.High || fall?.riskStatus == RiskStatus.Medium
         inactivitySeconds = InactivityMonitor.assess(imuMagnitude, inactivitySeconds, isFallActive)
@@ -52,8 +55,8 @@ object SensorFrameMerger {
                 heartRateBpm = heartRateBpm,
                 spo2Percent = spo2Percent,
                 respiratoryRate = respiratoryRate,
-                skinTempC = base.skinTempC,
-                sweatRatePercentPerMin = base.sweatRatePercentPerMin,
+                skinTempC = 0f,
+                sweatRatePercentPerMin = 0f,
                 imuMagnitude = imuMagnitude,
                 patientAgeYears = patientAgeYears,
             )
@@ -64,8 +67,7 @@ object SensorFrameMerger {
         val posture = when (fall?.riskStatus) {
             RiskStatus.High -> PostureStatus.Bad
             RiskStatus.Medium -> PostureStatus.Warning
-            null -> base.posture
-            RiskStatus.Low -> base.posture
+            else -> PostureStatus.Good
         }
 
         val spo2Quality = when {
@@ -74,35 +76,36 @@ object SensorFrameMerger {
             else -> Spo2Quality.Reliable
         }
 
-        val overexertionStatus = assessment?.overexertion?.status ?: base.fatigue
-        val dehydrationRisk = assessment?.dehydration?.risk ?: base.dehydration
-        val vitalsRisk = assessment?.vitals?.risk ?: base.vitalsRisk
-        val ecgStatus = assessment?.ecg?.status ?: base.ecgAnomaly
-        val rrIntervals = assessment?.ecg?.rrIntervalsMs ?: base.rrIntervalsMs
-        val hrReserve = assessment?.overexertion?.hrReservePercent ?: base.hrReservePercent
-
-        val merged = base.copy(
+        val frame = SensorFrame(
+            timestampMillis = System.currentTimeMillis(),
             heartRateBpm = heartRateBpm,
             spo2Percent = spo2Percent,
-            humidityPercent = humidityPercent,
+            systolicMmHg = assessment?.bloodPressure?.systolicMmHg ?: 0,
+            diastolicMmHg = assessment?.bloodPressure?.diastolicMmHg ?: 0,
+            skinTempC = 0f,
+            humidityPercent = ble.humidityPercent ?: 0f,
             respiratoryRate = respiratoryRate,
-            ecgSamples = ecgSamples,
+            posture = posture,
+            fatigue = assessment?.overexertion?.status ?: FatigueStatus.Safe,
+            dehydration = assessment?.dehydration?.risk ?: RiskStatus.Low,
+            fallRisk = confirmedFallRisk ?: RiskStatus.Low,
+            caregiverAlert = CaregiverAlertStatus.Normal,
             sosActive = ble.sosState,
             inactivityMinutes = InactivityMonitor.toMinutes(inactivitySeconds),
-            fallRisk = confirmedFallRisk ?: base.fallRisk,
-            posture = posture,
-            fatigue = overexertionStatus,
-            dehydration = dehydrationRisk,
-            vitalsRisk = vitalsRisk,
-            ecgAnomaly = ecgStatus,
-            rrIntervalsMs = rrIntervals,
+            supercapPercent = ble.batteryPercent ?: 0,
+            ecgSamples = ecgSamples,
+            ecgAnomaly = assessment?.ecg?.status ?: EcgAnomalyStatus.Unknown,
+            vitalsRisk = assessment?.vitals?.risk ?: RiskStatus.Low,
+            rrIntervalsMs = assessment?.ecg?.rrIntervalsMs ?: emptyList(),
             imuMagnitude = imuMagnitude,
-            hrReservePercent = hrReserve,
-            batteryPercent = ble.batteryPercent ?: base.batteryPercent,
             spo2Quality = spo2Quality,
+            sweatRatePercentPerMin = 0f,
+            hrReservePercent = assessment?.overexertion?.hrReservePercent ?: 0,
+            bpEstimated = assessment?.bloodPressure?.isEstimated ?: true,
+            batteryPercent = ble.batteryPercent,
         )
 
-        val alert = CaregiverAlertPolicy.evaluate(merged)
-        return merged.copy(caregiverAlert = alert)
+        val alert = CaregiverAlertPolicy.evaluate(frame)
+        return frame.copy(caregiverAlert = alert)
     }
 }

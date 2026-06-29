@@ -3,7 +3,6 @@ package com.eldercareguardian.ui
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
@@ -27,7 +26,6 @@ import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -46,7 +44,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -105,7 +102,6 @@ fun SmartSuitApp(
     val retentionDays by smartSuitViewModel.retentionDays.collectAsState()
     val permissionController = rememberPermissionController()
     var selectedTab by remember { mutableStateOf(AppTab.Vitals) }
-    var sessionMode by remember { mutableStateOf(SessionMode.Demo) }
 
     val jsonFilePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -132,8 +128,6 @@ fun SmartSuitApp(
                     frame = it,
                     selectedTab = selectedTab,
                     onTabSelected = { selectedTab = it },
-                    sessionMode = sessionMode,
-                    onSessionModeSelected = { sessionMode = it },
                     missingPermissions = permissionController.missingPermissions,
                     onRequestPermissions = permissionController.requestPermissions,
                     bleConnectionState = bleConnectionState,
@@ -177,14 +171,9 @@ fun SmartSuitApp(
                     onDeleteAllData = smartSuitViewModel::deleteAllData,
                     onLoadJsonFile = onLoadJsonFile,
                 )
-            } ?: LoadingScreen()
+            } ?: NoDataScreen()
         }
     }
-}
-
-private enum class SessionMode(val label: String) {
-    Demo("Demo"),
-    Ble("BLE"),
 }
 
 private enum class AppTab(
@@ -228,16 +217,24 @@ private fun rememberPermissionController(): PermissionController {
 }
 
 @Composable
-private fun LoadingScreen() {
+private fun NoDataScreen() {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = "Starting session",
-            color = Color(0xFF64748B),
-            style = MaterialTheme.typography.bodyLarge,
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "No sensor data",
+                color = Color(0xFF64748B),
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Connect to BLE wearable (ElderCare_v1)",
+                color = Color(0xFF94A3B8),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
     }
 }
 
@@ -246,8 +243,6 @@ private fun AppShell(
     frame: SensorFrame,
     selectedTab: AppTab,
     onTabSelected: (AppTab) -> Unit,
-    sessionMode: SessionMode,
-    onSessionModeSelected: (SessionMode) -> Unit,
     missingPermissions: List<String>,
     onRequestPermissions: () -> Unit,
     bleConnectionState: BleConnectionState,
@@ -338,17 +333,12 @@ private fun AppShell(
                 item {
                     Header(
                         frame = frame,
-                        sessionMode = sessionMode,
-                        onSessionModeSelected = onSessionModeSelected,
                         bleConnectionState = bleConnectionState,
                         patients = patients,
                         selectedPatientId = selectedPatientId,
                         selectedPatient = selectedPatient,
                         onSelectPatient = onSelectPatient,
                     )
-                }
-                item {
-                    ModeNotice(sessionMode)
                 }
                 if (frame.caregiverAlert == CaregiverAlertStatus.Emergency && !acknowledgedUrgent) {
                     item {
@@ -471,33 +461,8 @@ private fun PermissionNotice(
 }
 
 @Composable
-private fun ModeNotice(sessionMode: SessionMode) {
-    val message = when (sessionMode) {
-        SessionMode.Demo -> "Demo stream active for reliable elder-care pitch rehearsals."
-        SessionMode.Ble -> "BLE scanner looks for ElderCare_v1; simulator remains as fallback until firmware streams sensor data."
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (sessionMode == SessionMode.Demo) Color(0xFFEFF6FF) else Color(0xFFFFF7ED))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-        Text(
-            text = message,
-            color = if (sessionMode == SessionMode.Demo) Color(0xFF1D4ED8) else Color(0xFF9A3412),
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
 private fun Header(
     frame: SensorFrame,
-    sessionMode: SessionMode,
-    onSessionModeSelected: (SessionMode) -> Unit,
     bleConnectionState: BleConnectionState,
     patients: List<Patient>,
     selectedPatientId: Long,
@@ -534,7 +499,6 @@ private fun Header(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ModeSwitch(sessionMode, onSessionModeSelected)
                 DataSourceChip(bleConnectionState)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -585,37 +549,6 @@ private fun PatientSwitcher(
     }
 }
 
-@Composable
-private fun ModeSwitch(
-    selected: SessionMode,
-    onSelected: (SessionMode) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
-            .background(Color.White)
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        SessionMode.entries.forEach { mode ->
-            OutlinedButton(
-                onClick = { onSelected(mode) },
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                shape = RoundedCornerShape(6.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = if (selected == mode) Color(0xFF0F766E) else Color.Transparent,
-                    contentColor = if (selected == mode) Color.White else Color(0xFF334155),
-                ),
-                border = null,
-                modifier = Modifier.height(30.dp),
-            ) {
-                Text(mode.label, style = MaterialTheme.typography.labelMedium)
-            }
-        }
-    }
-}
-
 @Preview(showBackground = true, name = "Vitals Dashboard")
 @Composable
 private fun AppShellVitalsPreview() {
@@ -653,8 +586,6 @@ private fun AppShellVitalsPreview() {
             frame = mockFrame,
             selectedTab = AppTab.Vitals,
             onTabSelected = {},
-            sessionMode = SessionMode.Demo,
-            onSessionModeSelected = {},
             missingPermissions = emptyList(),
             onRequestPermissions = {},
             bleConnectionState = BleConnectionState.Connected,

@@ -61,7 +61,19 @@ object EcgAnomalyDetector {
         val meanHr = rr.meanHrBpm ?: reportedHrBpm
         if (meanHr == null) return EcgAssessment(EcgAnomalyStatus.Unknown, null, null, rr.rrIntervalsMs)
 
-        // Rate-based classification takes priority — these don't need many RR intervals.
+        // AFib classification requires enough RR intervals for statistical reliability.
+        // Check AFib first — AFib can coexist with tachycardia/bradycardia.
+        if (rr.rrIntervalsMs.size >= MIN_RR_INTERVALS) {
+            val rmssd = HeartRateExtractor.rmssd(rr.rrIntervalsMs)
+            if (rmssd != null) {
+                val irregularity = rrIrregularity(rr.rrIntervalsMs)
+                if (rmssd > AFIB_RMSSD_THRESHOLD_MS && irregularity > AFIB_IRREGULARITY_THRESHOLD) {
+                    return EcgAssessment(EcgAnomalyStatus.AFib, rmssd, meanHr, rr.rrIntervalsMs)
+                }
+            }
+        }
+
+        // Rate-based classification (AFib ruled out or insufficient data).
         if (meanHr >= TACHY_THRESHOLD_BPM) {
             return EcgAssessment(EcgAnomalyStatus.Tachycardia, null, meanHr, rr.rrIntervalsMs)
         }
@@ -69,23 +81,7 @@ object EcgAnomalyDetector {
             return EcgAssessment(EcgAnomalyStatus.Bradycardia, null, meanHr, rr.rrIntervalsMs)
         }
 
-        // AFib classification requires enough RR intervals for statistical reliability.
-        if (rr.rrIntervalsMs.size < MIN_RR_INTERVALS) {
-            return EcgAssessment(EcgAnomalyStatus.Normal, null, meanHr, rr.rrIntervalsMs)
-        }
-
-        val rmssd = HeartRateExtractor.rmssd(rr.rrIntervalsMs) ?: return EcgAssessment(EcgAnomalyStatus.Normal, null, meanHr, rr.rrIntervalsMs)
-        val irregularity = rrIrregularity(rr.rrIntervalsMs)
-
-        // AFib: HIGH RMSSD (chaotic intervals) AND HIGH irregularity.
-        // Fixed: was `rmssd < threshold` — now correctly `rmssd > threshold`.
-        val status = if (rmssd > AFIB_RMSSD_THRESHOLD_MS && irregularity > AFIB_IRREGULARITY_THRESHOLD) {
-            EcgAnomalyStatus.AFib
-        } else {
-            EcgAnomalyStatus.Normal
-        }
-
-        return EcgAssessment(status, rmssd, meanHr, rr.rrIntervalsMs)
+        return EcgAssessment(EcgAnomalyStatus.Normal, null, meanHr, rr.rrIntervalsMs)
     }
 
     /**

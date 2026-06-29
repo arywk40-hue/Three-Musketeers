@@ -30,10 +30,10 @@ class HealthRiskTfliteModel(context: Context, modelName: String = "health_risk.t
     companion object {
         private const val TAG = "HealthRiskTFLite"
 
-        // StandardScaler means/stds from synthetic training data (update after real training)
+        // StandardScaler means/stds from synthetic training data (updated Jun 29, 2026)
         // Order: hr, spo2, rr, temp, sweat, imu, hrr
-        private val MEANS = floatArrayOf(97.5f, 91.0f, 17.5f, 36.5f, 1.5f, 12.5f, 50.0f)
-        private val STDS  = floatArrayOf(36.0f,  5.2f,  7.2f,  2.0f, 0.9f,  7.2f, 29.0f)
+        private val MEANS = floatArrayOf(97.6502f, 91.0088f, 17.4795f, 36.4949f, 1.5067f, 12.49f, 49.8655f)
+        private val STDS  = floatArrayOf(36.1138f,  5.1866f,  7.2142f,  2.0261f, 0.8677f,  7.2091f, 28.8935f)
     }
 
     private var interpreter: Interpreter? = null

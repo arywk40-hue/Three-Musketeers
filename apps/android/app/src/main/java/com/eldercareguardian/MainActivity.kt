@@ -13,14 +13,17 @@ import com.eldercareguardian.consent.ConsentPreferences
 import com.eldercareguardian.consent.DpdpaConsentScreen
 import com.eldercareguardian.ui.SmartSuitApp
 import com.eldercareguardian.ui.SmartSuitViewModel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
     private val viewModel: SmartSuitViewModel by viewModels()
+    private lateinit var consentPreferences: ConsentPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val consentPreferences = ConsentPreferences.getInstance(this)
+        consentPreferences = ConsentPreferences.getInstance(this)
 
         setContent {
             val consentGranted by consentPreferences.isConsentGranted
@@ -42,8 +45,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Start foreground service when app is in foreground
-        // _serviceStarted flag in ViewModel prevents multiple starts
-        viewModel.onUiVisible()
+        // Only start the foreground monitoring service after DPDPA consent
+        // is granted. Without this guard the service notification appears
+        // on the consent screen and can crash on some OEMs.
+        val consented = runBlocking { consentPreferences.isConsentGranted.first() }
+        if (consented) {
+            viewModel.onUiVisible()
+        }
     }
 }

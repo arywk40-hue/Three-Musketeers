@@ -37,7 +37,7 @@ REFRACTORY_MS = 200
 DEFAULT_THRESHOLD = 0.55
 ADAPTIVE_FRACTION = 0.4
 BASELINE_WINDOW_SEC = 0.5
-WINDOW_SAMPLES = 256  # match Kotlin (1 second of synthetic ECG)
+WINDOW_SAMPLES = 256  # match Kotlin (1 second of synthetic ECG at 256 Hz)
 
 
 def subtract_baseline(samples: List[float], window: int) -> List[float]:
@@ -135,19 +135,19 @@ def assess_ecg(ecg_window: List[float], reported_hr: Optional[int] = None) -> st
     if mean_hr is None:
         return ECG_UNKNOWN
 
+    # Check AFib first — AFib can coexist with tachycardia/bradycardia
+    if len(rr) >= MIN_RR_INTERVALS:
+        r = rmssd(rr)
+        if r is not None:
+            irreg = rr_irregularity(rr)
+            if r > AFIB_RMSSD_THRESHOLD_MS and irreg > AFIB_IRREGULARITY_THRESHOLD:
+                return ECG_AFIB
+
+    # Rate-based classification (AFib ruled out or insufficient data)
     if mean_hr >= TACHY_THRESHOLD_BPM:
         return ECG_TACHY
     if mean_hr <= BRADY_THRESHOLD_BPM:
         return ECG_BRADY
-    if len(rr) < MIN_RR_INTERVALS:
-        return ECG_NORMAL
-
-    r = rmssd(rr)
-    if r is None:
-        return ECG_NORMAL
-    irreg = rr_irregularity(rr)
-    if r > AFIB_RMSSD_THRESHOLD_MS and irreg > AFIB_IRREGULARITY_THRESHOLD:
-        return ECG_AFIB
     return ECG_NORMAL
 
 
