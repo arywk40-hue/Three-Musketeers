@@ -52,7 +52,7 @@ All P0 and P1 tasks are now complete in code. Remaining items are manual ops (de
 
 ### 1. Deploy the FCM backend
 **Files:** `apps/backend/src/index.ts`, `apps/backend/.env.example`  
-**What's needed:** Get Firebase service account JSON, then `railway up` or deploy to Render. Set `FCM_SERVICE_ACCOUNT_JSON` env var.  
+**What's needed:** Get Firebase service account JSON, then `npm run deploy` from `apps/backend/`. Serverless Framework deploys to AWS Lambda + API Gateway.  
 **Effort:** 2 hours
 
 ### 2. Set GitHub CI secret

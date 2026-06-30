@@ -1,0 +1,24 @@
+service: eldercare-guardian-backend
+
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-south-1
+  environment:
+    FCM_SERVICE_ACCOUNT_JSON: ${env:FCM_SERVICE_ACCOUNT_JSON}
+
+functions:
+  api:
+    handler: dist/lambda.handler
+    events:
+      - httpApi: ANY /
+      - httpApi: ANY /{proxy+}
+
+plugins:
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 3001

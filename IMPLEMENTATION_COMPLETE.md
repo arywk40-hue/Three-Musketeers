@@ -75,7 +75,7 @@
    → Start the clock now!
 
 3. **Deploy FCM backend** (see `apps/backend/README.md`)  
-   → Railway: `railway up` (10 minutes)  
+   → AWS Lambda: `npm run deploy` from `apps/backend/` (5 minutes)  
    → Required for FCM test
 
 4. **FCM end-to-end test** (`docs/fcm-test-guide.md`)  
@@ -165,7 +165,7 @@ These are deferred to **after** the June 2026 pilot:
 ## Team next actions
 
 ### All (manual ops — no code changes needed)
-1. **Deploy FCM backend** — `railway up` or Render deploy (Pranay)
+1. **Deploy FCM backend** — `npm run deploy` from `apps/backend/` (Pranay)
 2. **Set GitHub CI secret** — `GOOGLE_SERVICES_JSON` in repo settings (Anyone)
 3. **FCM end-to-end test** — 2 phones, confirm push within 60s (Pranay + Ariyan)
 4. **Samsung Health partnership** — Submit application (Pranay)

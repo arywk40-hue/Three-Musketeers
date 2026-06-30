@@ -7,18 +7,23 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "deploy": "npm run build && npx serverless deploy",
+    "offline": "npx serverless offline"
   },
   "dependencies": {
-    "express": "^4.21.0",
-    "firebase-admin": "^12.6.0",
     "dotenv": "^16.4.5",
-    "fast-xml-parser": "^4.4.1"
+    "express": "^4.21.0",
+    "fast-xml-parser": "^4.4.1",
+    "firebase-admin": "^12.6.0",
+    "serverless-http": "^4.0.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^22.5.0",
-    "typescript": "^5.5.4",
-    "ts-node": "^10.9.2"
+    "serverless": "^4.38.1",
+    "serverless-offline": "^14.7.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
   }
 }
